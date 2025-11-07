@@ -4,6 +4,7 @@ using Unity.Robotics.ROSTCPConnector.ROSGeometry;
 using RosMessageTypes.Std;
 using RosMessageTypes.Geometry;
 using RosMessageTypes.Sensor;
+using RosMessageTypes.BuiltinInterfaces;
 using System.Collections;
 
 /// <summary>
@@ -316,15 +317,9 @@ public class ROSTCPManager : MonoBehaviour
             return;
         }
 
-        if (jointNames == null || positions == null)
+        if (jointNames == null || positions == null || jointNames.Length != positions.Length)
         {
-            Debug.LogWarning("⚠️ 無法發送關節命令：參數為空");
-            return;
-        }
-
-        if (jointNames.Length != positions.Length)
-        {
-            Debug.LogWarning($"⚠️ 關節名稱數量({jointNames.Length})和位置數量({positions.Length})不匹配");
+            Debug.LogError("❌ 關節名稱和位置數量不匹配");
             return;
         }
 
@@ -332,11 +327,12 @@ public class ROSTCPManager : MonoBehaviour
         {
             var jointMsg = new JointStateMsg();
 
-            // 設定時間戳
-            var now = System.DateTimeOffset.UtcNow;
+            // 設定訊息標頭
+            var now = System.DateTimeOffset.Now;
             jointMsg.header = new HeaderMsg();
             jointMsg.header.stamp = new TimeMsg();
             jointMsg.header.stamp.sec = (int)now.ToUnixTimeSeconds();
+            // 使用明確的 uint 轉換
             jointMsg.header.stamp.nanosec = (uint)((now.ToUnixTimeMilliseconds() % 1000) * 1000000);
             jointMsg.header.frame_id = "unity";
 
