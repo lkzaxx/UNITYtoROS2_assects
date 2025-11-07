@@ -331,8 +331,8 @@ public class ROSTCPManager : MonoBehaviour
             var now = System.DateTimeOffset.Now;
             jointMsg.header = new HeaderMsg();
             jointMsg.header.stamp = new TimeMsg();
-            jointMsg.header.stamp.sec = (uint)now.ToUnixTimeSeconds();
-            // 使用明確的 uint 轉換
+            jointMsg.header.stamp.sec = (int)now.ToUnixTimeSeconds();
+            // 使用明確的 uint 轉換（nanosec 是 uint 類型）
             jointMsg.header.stamp.nanosec = (uint)((now.ToUnixTimeMilliseconds() % 1000) * 1000000);
             jointMsg.header.frame_id = "unity";
 
