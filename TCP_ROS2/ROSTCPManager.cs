@@ -5,6 +5,7 @@ using RosMessageTypes.Std;
 using RosMessageTypes.Geometry;
 using RosMessageTypes.Sensor;
 using RosMessageTypes.BuiltinInterfaces;
+using Unity.Robotics.ROSTCPConnector.MessageGeneration;
 using System.Collections;
 
 /// <summary>
@@ -18,12 +19,17 @@ public class ROSTCPManager : MonoBehaviour
     public float heartbeatInterval = 1.0f;
     public float connectionTimeout = 5.0f;
 
-    [Header("Topic 設定")]
+    [Header("Topic 設定 - 接收 (ROS2 → Unity)")]
     public string heartbeatTopic = "/unity/heartbeat";
-    public string statusTopic = "/unity/status";
-    public string jointCommandsTopic = "/unity/joint_commands";
     public string jointStatesTopic = "/openarm/joint_states";
-    public string cmdVelTopic = "/cmd_vel";
+    public string endEffectorPoseTopic = "/openarm/end_effector_pose";
+    public string openarmStatusTopic = "/openarm/status";
+
+    [Header("Topic 設定 - 發送 (Unity → ROS2)")]
+    public string jointCommandsTopic = "/unity/joint_commands";
+    public string unityPoseTopic = "/unity/pose";
+    public string cmdVelTopic = "/openarm/cmd_vel";
+    public string gripperCommandTopic = "/openarm/gripper_command";
 
     [Header("狀態顯示")]
     public bool isConnected = false;
@@ -50,7 +56,7 @@ public class ROSTCPManager : MonoBehaviour
         get
         {
             if (instance == null)
-                instance = FindObjectOfType<ROSTCPManager>();
+                instance = FindFirstObjectByType<ROSTCPManager>();
             return instance;
         }
     }
@@ -133,11 +139,17 @@ public class ROSTCPManager : MonoBehaviour
         {
             // 預先註冊發布者，提高效能
             ros.RegisterPublisher<StringMsg>(heartbeatTopic);
-            ros.RegisterPublisher<StringMsg>(statusTopic);
             ros.RegisterPublisher<JointStateMsg>(jointCommandsTopic);
+            ros.RegisterPublisher<PoseStampedMsg>(unityPoseTopic);
             ros.RegisterPublisher<TwistMsg>(cmdVelTopic);
+            ros.RegisterPublisher<StringMsg>(gripperCommandTopic);
 
             Debug.Log("✅ 註冊所有發布者完成");
+            Debug.Log($"   - 心跳: {heartbeatTopic}");
+            Debug.Log($"   - 關節命令: {jointCommandsTopic}");
+            Debug.Log($"   - Unity位置: {unityPoseTopic}");
+            Debug.Log($"   - 速度命令: {cmdVelTopic}");
+            Debug.Log($"   - 夾爪命令: {gripperCommandTopic}");
         }
         catch (System.Exception ex)
         {
@@ -149,17 +161,21 @@ public class ROSTCPManager : MonoBehaviour
     {
         try
         {
-            // 訂閱狀態訊息
-            ros.Subscribe<StringMsg>(statusTopic, OnStatusReceived);
-            Debug.Log($"✅ 訂閱 {statusTopic}");
-
-            // 訂閱關節狀態
+            // 訂閱關節狀態 (10Hz)
             ros.Subscribe<JointStateMsg>(jointStatesTopic, OnJointStatesReceived);
-            Debug.Log($"✅ 訂閱 {jointStatesTopic}");
+            Debug.Log($"✅ 訂閱關節狀態: {jointStatesTopic}");
 
-            // 訂閱 OpenArm 狀態
-            ros.Subscribe<StringMsg>("/openarm/status", OnOpenArmStatusReceived);
-            Debug.Log($"✅ 訂閱 /openarm/status");
+            // 訂閱 OpenArm 系統狀態  
+            ros.Subscribe<StringMsg>(openarmStatusTopic, OnOpenArmStatusReceived);
+            Debug.Log($"✅ 訂閱系統狀態: {openarmStatusTopic}");
+
+            // 訂閱末端執行器位置
+            ros.Subscribe<PoseStampedMsg>(endEffectorPoseTopic, OnEndEffectorPoseReceived);
+            Debug.Log($"✅ 訂閱末端執行器位置: {endEffectorPoseTopic}");
+
+            // 可選：訂閱心跳回音（用於連接測試）
+            ros.Subscribe<StringMsg>(heartbeatTopic + "_echo", OnHeartbeatEchoReceived);
+            Debug.Log($"✅ 訂閱心跳回音: {heartbeatTopic}_echo");
         }
         catch (System.Exception ex)
         {
@@ -278,10 +294,39 @@ public class ROSTCPManager : MonoBehaviour
         }
     }
 
+    void OnEndEffectorPoseReceived(PoseStampedMsg poseMsg)
+    {
+        messagesReceived++;
+        lastMessageTime = Time.time;
+
+        if (poseMsg?.pose != null)
+        {
+            var pos = poseMsg.pose.position;
+            var rot = poseMsg.pose.orientation;
+            
+            Debug.Log($"📥 收到末端執行器位置: Pos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}) " +
+                     $"Rot({rot.x:F3}, {rot.y:F3}, {rot.z:F3}, {rot.w:F3})");
+
+            // 廣播末端執行器位置給 OpenArmController
+            BroadcastToOpenArmControllers("OnEndEffectorPoseReceived", poseMsg);
+        }
+    }
+
+    void OnHeartbeatEchoReceived(StringMsg echoMsg)
+    {
+        messagesReceived++;
+        lastMessageTime = Time.time;
+
+        Debug.Log($"📥 收到心跳回音: {echoMsg.data}");
+        
+        // 心跳回音確認連接正常
+        isConnected = true;
+    }
+
     void BroadcastToOpenArmControllers(string methodName, object message)
     {
         // 找到所有 OpenArmController 並發送訊息
-        OpenArmController[] controllers = FindObjectsOfType<OpenArmController>();
+        OpenArmController[] controllers = FindObjectsByType<OpenArmController>(FindObjectsSortMode.None);
 
         if (controllers.Length == 0)
         {
@@ -425,6 +470,71 @@ public class ROSTCPManager : MonoBehaviour
     }
 
     /// <summary>
+    /// 發送Unity位置命令
+    /// </summary>
+    public void PublishUnityPose(Vector3 position, Quaternion rotation)
+    {
+        if (ros == null)
+        {
+            Debug.LogError("❌ ROS 連接未初始化");
+            return;
+        }
+
+        try
+        {
+            var poseMsg = new PoseStampedMsg();
+            
+            // 設定訊息標頭
+            var now = System.DateTimeOffset.Now;
+            poseMsg.header = new HeaderMsg();
+            poseMsg.header.stamp = new TimeMsg();
+            poseMsg.header.stamp.sec = (int)now.ToUnixTimeSeconds();
+            poseMsg.header.stamp.nanosec = (uint)((now.ToUnixTimeMilliseconds() % 1000) * 1000000);
+            poseMsg.header.frame_id = "unity";
+
+            // 設定位置和旋轉
+            poseMsg.pose = new PoseMsg();
+            poseMsg.pose.position = new PointMsg { x = position.x, y = position.y, z = position.z };
+            poseMsg.pose.orientation = new QuaternionMsg { x = rotation.x, y = rotation.y, z = rotation.z, w = rotation.w };
+
+            ros.Publish(unityPoseTopic, poseMsg);
+            messagesSent++;
+
+            Debug.Log($"📤 發送Unity位置: Pos({position.x:F3}, {position.y:F3}, {position.z:F3}) " +
+                     $"Rot({rotation.x:F3}, {rotation.y:F3}, {rotation.z:F3}, {rotation.w:F3})");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"❌ 發送Unity位置失敗: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 發送夾爪命令
+    /// </summary>
+    public void PublishGripperCommand(string command, float position = 0.0f)
+    {
+        if (ros == null)
+        {
+            Debug.LogError("❌ ROS 連接未初始化");
+            return;
+        }
+
+        try
+        {
+            var gripperMsg = new StringMsg { data = $"{command}:{position:F3}" };
+            ros.Publish(gripperCommandTopic, gripperMsg);
+            messagesSent++;
+
+            Debug.Log($"📤 發送夾爪命令: {command} (位置: {position:F3})");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"❌ 發送夾爪命令失敗: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// 取得連接狀態
     /// </summary>
     public bool IsConnected()
@@ -448,6 +558,80 @@ public class ROSTCPManager : MonoBehaviour
     public void TestSendCmdVel()
     {
         PublishCmdVel(0.5f, 0.3f);
+    }
+
+    [ContextMenu("診斷連接狀態")]
+    public void DiagnoseConnection()
+    {
+        Debug.Log("=== ROS TCP 連接診斷 ===");
+        Debug.Log($"ROS IP: {rosIPAddress}:{rosPort}");
+        Debug.Log($"ROS Connection Instance: {(ros != null ? "存在" : "null")}");
+        
+        if (ros != null)
+        {
+            Debug.Log($"Has Connection Thread: {ros.HasConnectionThread}");
+            Debug.Log($"發送訊息數: {messagesSent}");
+            Debug.Log($"接收訊息數: {messagesReceived}");
+            Debug.Log($"最後訊息時間: {(Time.time - lastMessageTime):F1}秒前");
+        }
+        
+        Debug.Log("=== Topic 配置 ===");
+        Debug.Log($"心跳 Topic: {heartbeatTopic}");
+        Debug.Log($"系統狀態 Topic: {openarmStatusTopic}");
+        Debug.Log($"關節命令 Topic: {jointCommandsTopic}");
+        Debug.Log($"關節狀態 Topic: {jointStatesTopic}");
+        Debug.Log($"速度命令 Topic: {cmdVelTopic}");
+        
+        Debug.Log("=== 建議檢查 ===");
+        Debug.Log("1. 確認 ROS2 ros_tcp_bridge 正在運行");
+        Debug.Log("2. 檢查 ROS2 節點是否發布到正確的 topics");
+        Debug.Log("3. 使用 'ros2 topic list' 查看可用的 topics");
+        Debug.Log("4. 使用 'ros2 topic echo /topic_name' 測試訊息");
+    }
+
+    [ContextMenu("測試接收回音")]
+    public void TestEcho()
+    {
+        // 發送測試訊息到狀態topic，看是否有回音
+        PublishStringMessage(openarmStatusTopic, "unity_test_echo");
+        Debug.Log($"📤 發送測試回音到 {openarmStatusTopic}");
+    }
+
+    [ContextMenu("測試Unity位置命令")]
+    public void TestUnityPose()
+    {
+        Vector3 testPos = new Vector3(1.0f, 2.0f, 3.0f);
+        Quaternion testRot = Quaternion.Euler(0, 45, 0);
+        PublishUnityPose(testPos, testRot);
+    }
+
+    [ContextMenu("測試夾爪開啟")]
+    public void TestGripperOpen()
+    {
+        PublishGripperCommand("open", 0.8f);
+    }
+
+    [ContextMenu("測試夾爪關閉")]
+    public void TestGripperClose()
+    {
+        PublishGripperCommand("close", 0.0f);
+    }
+
+    [ContextMenu("驗證所有Topic配置")]
+    public void VerifyTopicConfiguration()
+    {
+        Debug.Log("=== Topic 配置驗證 ===");
+        Debug.Log("接收端 (ROS2 → Unity):");
+        Debug.Log($"  心跳: {heartbeatTopic}");
+        Debug.Log($"  關節狀態: {jointStatesTopic}");
+        Debug.Log($"  末端執行器位置: {endEffectorPoseTopic}");
+        Debug.Log($"  系統狀態: {openarmStatusTopic}");
+        
+        Debug.Log("發送端 (Unity → ROS2):");
+        Debug.Log($"  關節命令: {jointCommandsTopic}");
+        Debug.Log($"  Unity位置: {unityPoseTopic}");
+        Debug.Log($"  速度命令: {cmdVelTopic}");
+        Debug.Log($"  夾爪命令: {gripperCommandTopic}");
     }
 
     #endregion
@@ -498,6 +682,45 @@ public class ROSTCPManager : MonoBehaviour
             TestSendCmdVel();
         }
         GUILayout.EndHorizontal();
+
+        // 診斷按鈕
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("診斷連接"))
+        {
+            DiagnoseConnection();
+        }
+
+        if (GUILayout.Button("驗證配置"))
+        {
+            VerifyTopicConfiguration();
+        }
+        GUILayout.EndHorizontal();
+
+        // 新功能測試按鈕
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("測試位置"))
+        {
+            TestUnityPose();
+        }
+
+        if (GUILayout.Button("夾爪開"))
+        {
+            TestGripperOpen();
+        }
+
+        if (GUILayout.Button("夾爪關"))
+        {
+            TestGripperClose();
+        }
+        GUILayout.EndHorizontal();
+
+        // 連接問題提示
+        if (messagesSent > 0 && messagesReceived == 0)
+        {
+            GUI.color = Color.yellow;
+            GUILayout.Label("⚠️ 只能發送無法接收，請檢查ROS2端");
+            GUI.color = Color.white;
+        }
 
         GUILayout.EndArea();
     }

@@ -3,6 +3,7 @@ using UnityEngine;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Std;
 using RosMessageTypes.Sensor;
+using RosMessageTypes.Geometry;
 
 public class OpenArmController : MonoBehaviour
 {
@@ -40,7 +41,7 @@ public class OpenArmController : MonoBehaviour
     void InitializeController()
     {
         // 尋找 ROSTCPManager
-        tcpManager = FindObjectOfType<ROSTCPManager>();
+        tcpManager = FindFirstObjectByType<ROSTCPManager>();
         if (tcpManager == null)
         {
             Debug.LogError("❌ OpenArmController: 找不到 ROSTCPManager！");
@@ -193,6 +194,36 @@ public class OpenArmController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 接收末端執行器位置
+    /// </summary>
+    public void OnEndEffectorPoseReceived(PoseStampedMsg poseMsg)
+    {
+        if (poseMsg?.pose != null)
+        {
+            var pos = poseMsg.pose.position;
+            var rot = poseMsg.pose.orientation;
+            
+            Debug.Log($"📥 OpenArmController: 收到末端執行器位置: " +
+                     $"Pos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}) " +
+                     $"Rot({rot.x:F3}, {rot.y:F3}, {rot.z:F3}, {rot.w:F3})");
+            
+            // TODO: 更新末端執行器視覺化
+            UpdateEndEffectorVisualization(pos, rot);
+        }
+    }
+
+    void UpdateEndEffectorVisualization(PointMsg position, QuaternionMsg rotation)
+    {
+        // TODO: 實現末端執行器視覺化更新
+        // 例如：更新末端執行器的3D標記位置
+        
+        if (Time.frameCount % 30 == 0)  // 每30幀記錄一次
+        {
+            Debug.Log($"🔄 OpenArmController: 更新末端執行器視覺化");
+        }
+    }
+
     void UpdateArmVisualization()
     {
         // TODO: 在這裡實現機械手臂視覺化更新
@@ -225,7 +256,7 @@ public class OpenArmController : MonoBehaviour
             Debug.LogWarning("⚠️ OpenArmController: TCPManager 未找到");
 
             // 嘗試重新尋找
-            tcpManager = FindObjectOfType<ROSTCPManager>();
+            tcpManager = FindFirstObjectByType<ROSTCPManager>();
             if (tcpManager == null)
             {
                 Debug.LogError("❌ OpenArmController: 無法找到 TCPManager");
@@ -308,6 +339,56 @@ public class OpenArmController : MonoBehaviour
     public bool IsReceivingStates()
     {
         return isReceivingStates && (Time.time - lastStateUpdateTime) < 5.0f;
+    }
+
+    /// <summary>
+    /// 發送Unity位置命令
+    /// </summary>
+    public void SendUnityPose(Vector3 position, Quaternion rotation)
+    {
+        if (tcpManager != null)
+        {
+            tcpManager.PublishUnityPose(position, rotation);
+            Debug.Log($"📤 OpenArmController: 發送Unity位置命令");
+        }
+        else
+        {
+            Debug.LogWarning("⚠️ OpenArmController: TCPManager 未找到，無法發送位置命令");
+        }
+    }
+
+    /// <summary>
+    /// 發送夾爪命令
+    /// </summary>
+    public void SendGripperCommand(string command, float position = 0.0f)
+    {
+        if (tcpManager != null)
+        {
+            tcpManager.PublishGripperCommand(command, position);
+            Debug.Log($"📤 OpenArmController: 發送夾爪命令: {command}");
+        }
+        else
+        {
+            Debug.LogWarning("⚠️ OpenArmController: TCPManager 未找到，無法發送夾爪命令");
+        }
+    }
+
+    /// <summary>
+    /// 開啟夾爪
+    /// </summary>
+    [ContextMenu("開啟夾爪")]
+    public void OpenGripper()
+    {
+        SendGripperCommand("open", 0.8f);
+    }
+
+    /// <summary>
+    /// 關閉夾爪
+    /// </summary>
+    [ContextMenu("關閉夾爪")]
+    public void CloseGripper()
+    {
+        SendGripperCommand("close", 0.0f);
     }
 
     /// <summary>
@@ -396,6 +477,19 @@ public class OpenArmController : MonoBehaviour
         if (GUILayout.Button("重新初始化"))
         {
             Reinitialize();
+        }
+        GUILayout.EndHorizontal();
+
+        // 新功能按鈕
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("開啟夾爪"))
+        {
+            OpenGripper();
+        }
+
+        if (GUILayout.Button("關閉夾爪"))
+        {
+            CloseGripper();
         }
         GUILayout.EndHorizontal();
 
