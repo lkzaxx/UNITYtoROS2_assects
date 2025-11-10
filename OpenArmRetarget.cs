@@ -10,14 +10,19 @@ public class OpenArmRetarget : MonoBehaviour
     {
         public string nameHint;
         public ArticulationBody joint;
+
         [Header("Source (Humanoid bone)")]
         public Transform source;          // 來源骨骼（上臂/前臂/手腕）
         public Axis sourceAxis = Axis.X;  // 取該骨骼的哪一個 local Euler 軸
+
         [Header("Mapping")]
         public float scale = 1f;          // 角度比例（可用 -1 反向）
         public float offsetDeg = 0f;      // 角度偏移（度）
         public float minDeg = -180f;
         public float maxDeg = 180f;
+
+        [Header("Stability")]
+        public float deadZone = 3f;       // 新增：死區（度）。|角度| 小於此值時視為 0
 
         [Header("Drive")]
         public float stiffness = 1500f;
@@ -50,7 +55,16 @@ public class OpenArmRetarget : MonoBehaviour
             drive.forceLimit = forceLimit;
 
             float src = ReadSourceAngleDeg();
-            float targetDeg = Mathf.Clamp(offsetDeg + scale * src, minDeg, maxDeg);
+
+            // 映射角度
+            float mapped = offsetDeg + scale * src;
+
+            // ★ 死區：如果在 [-deadZone, +deadZone]，視為 0
+            if (Mathf.Abs(mapped) < deadZone)
+                mapped = 0f;
+
+            // 上下限限制
+            float targetDeg = Mathf.Clamp(mapped, minDeg, maxDeg);
 
             drive.target = targetDeg; // ArticulationDrive.target 使用「度」
             joint.xDrive = drive;
@@ -63,7 +77,7 @@ public class OpenArmRetarget : MonoBehaviour
     [Header("Right arm joints (1..7)")]
     public JointMap[] right = new JointMap[7];
 
-    void Update()
+    void FixedUpdate()
     {
         if (left != null)  foreach (var j in left)  j?.Apply();
         if (right != null) foreach (var j in right) j?.Apply();
