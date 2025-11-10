@@ -1,0 +1,35 @@
+{
+    "version": 1,
+    "name": "Gameplay",
+    "maps": [
+        {
+            "name": "Calibrate",
+            "id": "1ec0375a-bdbe-49c0-9088-d2d59d6ed185",
+            "actions": [
+                {
+                    "name": "Calibrate",
+                    "type": "Button",
+                    "id": "06835780-ae0e-4103-a794-5619a9d4bb86",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "de9c557b-f47a-49a4-ae40-a6f99f26a915",
+                    "path": "<XRController>{RightHand}/grip",
+                    "interactions": "Hold(duration=0.6,pressPoint=0.7)",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Calibrate",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}
