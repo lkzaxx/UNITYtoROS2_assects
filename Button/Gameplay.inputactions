@@ -29,6 +29,34 @@
                     "isPartOfComposite": false
                 }
             ]
+        },
+        {
+            "name": "GripperTrigger",
+            "id": "be543372-6d73-4d1c-a86a-c5e01c2ce749",
+            "actions": [
+                {
+                    "name": "New action",
+                    "type": "Button",
+                    "id": "af7489c6-4f08-4560-a590-3f9202e52460",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "Press",
+                    "initialStateCheck": true
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "738b3189-b500-4edc-851d-47eb57e18425",
+                    "path": "<OculusTouchController>/triggerPressed",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "New action",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
         }
     ],
     "controlSchemes": []
