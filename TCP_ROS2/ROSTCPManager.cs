@@ -45,6 +45,20 @@ public class ROSTCPManager : MonoBehaviour
         "R_J1", "R_J2", "R_J3", "R_J4", "R_J5", "R_J6", "R_J7"
     };
 
+		[Header("Gripper (Prismatic) → JointState")]
+		[Tooltip("左手夾爪（GripperHoldToOpenPrismatic）")]
+		public GripperHoldToOpenPrismatic leftGripper;
+		[Tooltip("右手夾爪（GripperHoldToOpenPrismatic）")]
+		public GripperHoldToOpenPrismatic rightGripper;
+		public bool autoSendGripperEE = true;            // 是否自動發送 L_EE/R_EE
+		public float gripperSendInterval = 0.05f;        // 發送間隔（秒）
+		[Tooltip("夾爪 JointState 名稱")]
+		public string leftEEName = "L_EE";
+		public string rightEEName = "R_EE";
+		[Tooltip("夾爪行程限制（公尺）")]
+		public float gripperMin = 0f;
+		public float gripperMax = 0.0425f;
+
     [Header("狀態顯示")]
     public bool isConnected = false;
     public bool isHeartbeatActive = true;
@@ -65,6 +79,7 @@ public class ROSTCPManager : MonoBehaviour
 
     // 關節狀態發送
     private float lastJointStateSendTime = 0f;
+    private float lastGripperSendTime = 0f;
 
     // OpenArm 關節上下限（弧度）- 根據實際硬體規格
     private readonly float[] jointMinLimits = new float[7] {
@@ -578,6 +593,66 @@ public class ROSTCPManager : MonoBehaviour
     }
 
     /// <summary>
+		/// 從左右 GripperHoldToOpenPrismatic 讀取目標位置（公尺），並以 JointState 發送 (L_EE, R_EE)
+    /// </summary>
+		void PublishGripperEEJointState()
+    {
+			if (ros == null) return;
+
+			float left = GetJawTargetMeters(leftGripper, leftGripper != null ? leftGripper.leftJaw : null);
+			float right = GetJawTargetMeters(rightGripper, rightGripper != null ? rightGripper.leftJaw : null);
+
+        // 夾爪行程限制（0 ~ 0.0425 m）
+        left = Mathf.Clamp(left, gripperMin, gripperMax);
+        right = Mathf.Clamp(right, gripperMin, gripperMax);
+
+        try
+        {
+            var jointMsg = new JointStateMsg();
+
+            var now = System.DateTimeOffset.Now;
+            jointMsg.header = new HeaderMsg();
+            jointMsg.header.stamp = new TimeMsg();
+            jointMsg.header.stamp.sec = (int)now.ToUnixTimeSeconds();
+            jointMsg.header.stamp.nanosec = (uint)((now.ToUnixTimeMilliseconds() % 1000) * 1000000);
+            jointMsg.header.frame_id = "unity";
+
+            jointMsg.name = new string[2] { leftEEName, rightEEName };
+            jointMsg.position = new double[2] { left, right };   // 單位：公尺
+            jointMsg.velocity = new double[2] { 0.0, 0.0 };
+            jointMsg.effort = new double[2] { 0.0, 0.0 };
+
+            ros.Publish(jointCommandsTopic, jointMsg);
+            messagesSent++;
+
+            Debug.Log($"📤 發送夾爪 JointState: {leftEEName}={left:F4} m, {rightEEName}={right:F4} m");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"❌ 發送夾爪 JointState 失敗: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+		/// 根據 gripper 設定的軸向，讀取 ArticulationBody 對應 Drive 的 target（公尺）
+    /// </summary>
+		float GetJawTargetMeters(GripperHoldToOpenPrismatic gripperRef, ArticulationBody jaw)
+    {
+			if (jaw == null || gripperRef == null) return 0f;
+			switch (gripperRef.axis)
+        {
+            case GripperHoldToOpenPrismatic.Axis.X:
+                return jaw.xDrive.target;
+            case GripperHoldToOpenPrismatic.Axis.Y:
+                return jaw.yDrive.target;
+            case GripperHoldToOpenPrismatic.Axis.Z:
+                return jaw.zDrive.target;
+            default:
+                return 0f;
+        }
+    }
+
+    /// <summary>
     /// 取得連接狀態
     /// </summary>
     public bool IsConnected()
@@ -782,8 +857,8 @@ public class ROSTCPManager : MonoBehaviour
         // 面板位置和大小（左下角）
         float panelX = 10;
         float panelY = Screen.height - 290;
-        float panelWidth = 820;  // 增加寬度以容納兩列
-        float panelHeight = 280;
+			float panelWidth = 820;  // 增加寬度以容納兩列
+			float panelHeight = 310; // 增加高度以容納夾爪顯示
 
         GUILayout.BeginArea(new Rect(panelX, panelY, panelWidth, panelHeight));
 
@@ -791,6 +866,48 @@ public class ROSTCPManager : MonoBehaviour
         GUI.color = Color.cyan;
         GUILayout.Label("OpenArm 關節角度監控", GUI.skin.box);
         GUI.color = Color.white;
+
+			// 夾爪顯示（置於面板上方區域）
+			GUILayout.BeginVertical(GUILayout.Width(panelWidth - 20));
+			GUILayout.Label("夾爪 (Grippers):", EditorGUIStyle());
+			{
+				// 左夾爪
+				if (leftGripper != null && leftGripper.leftJaw != null)
+				{
+					float leftMeters = GetJawTargetMeters(leftGripper, leftGripper.leftJaw);
+					bool leftOut = leftMeters < gripperMin - 1e-5f || leftMeters > gripperMax + 1e-5f;
+					float leftClamped = Mathf.Clamp(leftMeters, gripperMin, gripperMax);
+					GUI.color = leftOut ? Color.red : Color.green;
+					GUILayout.Label($"  {leftEEName} = {leftClamped,6:F4} m {(leftOut ? "[超出範圍]" : "")}");
+					GUI.color = Color.white;
+				}
+				else
+				{
+					GUI.color = Color.gray;
+					GUILayout.Label($"  {leftEEName} = 未設定");
+					GUI.color = Color.white;
+				}
+
+				// 右夾爪
+				if (rightGripper != null && rightGripper.leftJaw != null)
+				{
+					float rightMeters = GetJawTargetMeters(rightGripper, rightGripper.leftJaw);
+					bool rightOut = rightMeters < gripperMin - 1e-5f || rightMeters > gripperMax + 1e-5f;
+					float rightClamped = Mathf.Clamp(rightMeters, gripperMin, gripperMax);
+					GUI.color = rightOut ? Color.red : Color.green;
+					GUILayout.Label($"  {rightEEName} = {rightClamped,6:F4} m {(rightOut ? "[超出範圍]" : "")}");
+					GUI.color = Color.white;
+				}
+				else
+				{
+					GUI.color = Color.gray;
+					GUILayout.Label($"  {rightEEName} = 未設定");
+					GUI.color = Color.white;
+				}
+			}
+			GUILayout.EndVertical();
+
+			GUILayout.Space(4);
 
         // 並排顯示左右臂
         GUILayout.BeginHorizontal();
@@ -919,6 +1036,16 @@ public class ROSTCPManager : MonoBehaviour
                 SendRetargetJointsToROS2("left", retarget.left, leftJointNames);
                 SendRetargetJointsToROS2("right", retarget.right, rightJointNames);
                 lastJointStateSendTime = Time.time;
+            }
+        }
+
+        // 自動發送夾爪 L_EE / R_EE
+			if (autoSendGripperEE && (leftGripper != null || rightGripper != null) && isConnected && ros != null)
+        {
+            if (Time.time - lastGripperSendTime >= gripperSendInterval)
+            {
+					PublishGripperEEJointState();
+                lastGripperSendTime = Time.time;
             }
         }
     }

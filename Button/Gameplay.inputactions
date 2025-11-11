@@ -31,7 +31,7 @@
             ]
         },
         {
-            "name": "GripperTrigger",
+            "name": "RightGripperTrigger",
             "id": "be543372-6d73-4d1c-a86a-c5e01c2ce749",
             "actions": [
                 {
@@ -40,7 +40,7 @@
                     "id": "af7489c6-4f08-4560-a590-3f9202e52460",
                     "expectedControlType": "",
                     "processors": "",
-                    "interactions": "Press",
+                    "interactions": "",
                     "initialStateCheck": true
                 }
             ],
@@ -48,8 +48,36 @@
                 {
                     "name": "",
                     "id": "738b3189-b500-4edc-851d-47eb57e18425",
-                    "path": "<OculusTouchController>/triggerPressed",
+                    "path": "<XRController>{RightHand}/triggerPressed",
+                    "interactions": "Press",
+                    "processors": "",
+                    "groups": "",
+                    "action": "New action",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        },
+        {
+            "name": "LeftGripperTrigger",
+            "id": "52e8aa90-9abb-45f0-85ad-8b37c6ac63c2",
+            "actions": [
+                {
+                    "name": "New action",
+                    "type": "Button",
+                    "id": "d0f9b256-ab62-4120-9dcb-bc33617c8a3a",
+                    "expectedControlType": "",
+                    "processors": "",
                     "interactions": "",
+                    "initialStateCheck": true
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "2d4c3fa6-b22e-4070-90c1-b3791da03954",
+                    "path": "<XRController>{LeftHand}/triggerPressed",
+                    "interactions": "Press",
                     "processors": "",
                     "groups": "",
                     "action": "New action",
