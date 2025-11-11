@@ -31,6 +31,20 @@ public class ROSTCPManager : MonoBehaviour
     public string cmdVelTopic = "/openarm/cmd_vel";
     public string gripperCommandTopic = "/openarm/gripper_command";
 
+    [Header("OpenArm Retarget 自動發送")]
+    public OpenArmRetarget retarget;                 // OpenArmRetarget 引用
+    public bool autoSendJointStates = false;         // 是否自動發送關節狀態
+    public float jointStateSendInterval = 0.1f;      // 發送間隔（秒）
+    public bool showJointValuesOnScreen = true;      // 在螢幕上顯示關節值
+    [Tooltip("左臂關節名稱（7個）")]
+    public string[] leftJointNames = new string[7] {
+        "L_J1", "L_J2", "L_J3", "L_J4", "L_J5", "L_J6", "L_J7"
+    };
+    [Tooltip("右臂關節名稱（7個）")]
+    public string[] rightJointNames = new string[7] {
+        "R_J1", "R_J2", "R_J3", "R_J4", "R_J5", "R_J6", "R_J7"
+    };
+
     [Header("狀態顯示")]
     public bool isConnected = false;
     public bool isHeartbeatActive = true;
@@ -48,6 +62,29 @@ public class ROSTCPManager : MonoBehaviour
     // 連接狀態
     private bool connectionInitialized = false;
     private float lastMessageTime = 0f;
+
+    // 關節狀態發送
+    private float lastJointStateSendTime = 0f;
+
+    // OpenArm 關節上下限（弧度）- 根據實際硬體規格
+    private readonly float[] jointMinLimits = new float[7] {
+        -3.49f,   // J1
+        -3.32f,   // J2
+        -1.57f,   // J3
+        0f,       // J4
+        -1.57f,   // J5
+        -0.79f,   // J6
+        -1.57f    // J7
+    };
+    private readonly float[] jointMaxLimits = new float[7] {
+        3.48f,    // J1
+        3.28f,    // J2
+        1.50f,    // J3
+        2.4f,     // J4
+        1.50f,    // J5
+        0.71f,    // J6
+        1.50f     // J7
+    };
 
     // 單例模式
     private static ROSTCPManager instance;
@@ -122,6 +159,12 @@ public class ROSTCPManager : MonoBehaviour
             connectionInitialized = true;
             isConnected = true;
             Debug.Log("✅ ROSTCPManager 初始化完成");
+
+            // 啟用自動發送關節狀態
+            if (autoSendJointStates && retarget != null)
+            {
+                Debug.Log("✅ 啟用 OpenArmRetarget 自動發送");
+            }
         }
         catch (System.Exception ex)
         {
@@ -723,6 +766,267 @@ public class ROSTCPManager : MonoBehaviour
         }
 
         GUILayout.EndArea();
+
+        // 顯示關節值面板
+        if (showJointValuesOnScreen && retarget != null)
+        {
+            DrawJointValuesPanel();
+        }
+    }
+
+    /// <summary>
+    /// 繪製關節值顯示面板
+    /// </summary>
+    void DrawJointValuesPanel()
+    {
+        // 面板位置和大小（左下角）
+        float panelX = 10;
+        float panelY = Screen.height - 290;
+        float panelWidth = 820;  // 增加寬度以容納兩列
+        float panelHeight = 280;
+
+        GUILayout.BeginArea(new Rect(panelX, panelY, panelWidth, panelHeight));
+
+        // 標題
+        GUI.color = Color.cyan;
+        GUILayout.Label("OpenArm 關節角度監控", GUI.skin.box);
+        GUI.color = Color.white;
+
+        // 並排顯示左右臂
+        GUILayout.BeginHorizontal();
+
+        // 左臂關節值（左側）
+        GUILayout.BeginVertical(GUILayout.Width(400));
+        GUILayout.Label("左臂 (Left Arm):", EditorGUIStyle());
+        if (retarget.left != null && retarget.left.Length > 0)
+        {
+            for (int i = 0; i < retarget.left.Length; i++)
+            {
+                if (retarget.left[i]?.joint != null)
+                {
+                    var drive = retarget.left[i].joint.xDrive;
+                    float angleDeg = drive.target;
+                    float angleRad = angleDeg * Mathf.Deg2Rad;
+                    
+                    // 檢查是否超出範圍
+                    bool outOfRange = false;
+                    string rangeStatus = "";
+                    if (i < jointMinLimits.Length)
+                    {
+                        if (angleRad < jointMinLimits[i])
+                        {
+                            outOfRange = true;
+                            rangeStatus = " [低於下限]";
+                        }
+                        else if (angleRad > jointMaxLimits[i])
+                        {
+                            outOfRange = true;
+                            rangeStatus = " [高於上限]";
+                        }
+                    }
+                    
+                    GUI.color = outOfRange ? Color.red : Color.green;
+                    GUILayout.Label($"  L_J{i + 1} = {angleDeg,7:F2}° ({angleRad,6:F3} rad){rangeStatus}");
+                    GUI.color = Color.white;
+                }
+                else
+                {
+                    GUI.color = Color.gray;
+                    GUILayout.Label($"  L_J{i + 1} = 未連接");
+                    GUI.color = Color.white;
+                }
+            }
+        }
+        else
+        {
+            GUILayout.Label("  左臂未設定");
+        }
+        GUILayout.EndVertical();
+
+        // 右臂關節值（右側）
+        GUILayout.BeginVertical(GUILayout.Width(400));
+        GUILayout.Label("右臂 (Right Arm):", EditorGUIStyle());
+        if (retarget.right != null && retarget.right.Length > 0)
+        {
+            for (int i = 0; i < retarget.right.Length; i++)
+            {
+                if (retarget.right[i]?.joint != null)
+                {
+                    var drive = retarget.right[i].joint.xDrive;
+                    float angleDeg = drive.target;
+                    float angleRad = angleDeg * Mathf.Deg2Rad;
+                    
+                    // 檢查是否超出範圍
+                    bool outOfRange = false;
+                    string rangeStatus = "";
+                    if (i < jointMinLimits.Length)
+                    {
+                        if (angleRad < jointMinLimits[i])
+                        {
+                            outOfRange = true;
+                            rangeStatus = " [低於下限]";
+                        }
+                        else if (angleRad > jointMaxLimits[i])
+                        {
+                            outOfRange = true;
+                            rangeStatus = " [高於上限]";
+                        }
+                    }
+                    
+                    GUI.color = outOfRange ? Color.red : Color.green;
+                    GUILayout.Label($"  R_J{i + 1} = {angleDeg,7:F2}° ({angleRad,6:F3} rad){rangeStatus}");
+                    GUI.color = Color.white;
+                }
+                else
+                {
+                    GUI.color = Color.gray;
+                    GUILayout.Label($"  R_J{i + 1} = 未連接");
+                    GUI.color = Color.white;
+                }
+            }
+        }
+        else
+        {
+            GUILayout.Label("  右臂未設定");
+        }
+        GUILayout.EndVertical();
+
+        GUILayout.EndHorizontal();
+        GUILayout.EndArea();
+    }
+
+    /// <summary>
+    /// 取得編輯器樣式（粗體）
+    /// </summary>
+    GUIStyle EditorGUIStyle()
+    {
+        GUIStyle style = new GUIStyle(GUI.skin.label);
+        style.fontStyle = FontStyle.Bold;
+        return style;
+    }
+
+    #endregion
+
+    #region OpenArm Retarget 自動發送
+
+    void FixedUpdate()
+    {
+        // 自動發送關節狀態
+        if (autoSendJointStates && retarget != null && isConnected && ros != null)
+        {
+            if (Time.time - lastJointStateSendTime >= jointStateSendInterval)
+            {
+                SendRetargetJointsToROS2("left", retarget.left, leftJointNames);
+                SendRetargetJointsToROS2("right", retarget.right, rightJointNames);
+                lastJointStateSendTime = Time.time;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 從 OpenArmRetarget 讀取關節角度並發送到 ROS2
+    /// </summary>
+    void SendRetargetJointsToROS2(string side, OpenArmRetarget.JointMap[] joints, string[] jointNames)
+    {
+        if (joints == null || joints.Length == 0) return;
+        if (jointNames == null || jointNames.Length != joints.Length)
+        {
+            Debug.LogWarning($"⚠️ {side} 關節名稱數量({jointNames?.Length})與關節數量({joints.Length})不匹配");
+            return;
+        }
+
+        float[] anglesRad = new float[joints.Length];
+        bool hasValidJoints = false;
+
+        // 讀取關節角度並轉換為弧度
+        for (int i = 0; i < joints.Length; i++)
+        {
+            if (joints[i]?.joint != null)
+            {
+                var drive = joints[i].joint.xDrive;
+                float angleDeg = drive.target;
+                float angleRad = angleDeg * Mathf.Deg2Rad;  // 度 → 弧度
+
+                // 套用上下限檢查
+                angleRad = ClampJointAngle(angleRad, i);
+                anglesRad[i] = angleRad;
+                hasValidJoints = true;
+            }
+            else
+            {
+                anglesRad[i] = 0f;
+            }
+        }
+
+        if (!hasValidJoints) return;
+
+        // 發送到 ROS2
+        try
+        {
+            PublishJointCommands(jointNames, anglesRad);
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"❌ 發送 {side} 關節狀態失敗: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 限制關節角度在安全範圍內
+    /// </summary>
+    float ClampJointAngle(float angleRad, int jointIndex)
+    {
+        if (jointIndex < 0 || jointIndex >= jointMinLimits.Length)
+            return angleRad;
+
+        float clamped = Mathf.Clamp(angleRad, jointMinLimits[jointIndex], jointMaxLimits[jointIndex]);
+
+        // 如果超出範圍，記錄警告
+        if (Mathf.Abs(clamped - angleRad) > 0.01f)
+        {
+            Debug.LogWarning($"⚠️ Joint {jointIndex + 1} 角度超出範圍: {angleRad:F3} rad → 限制為 {clamped:F3} rad " +
+                           $"(範圍: {jointMinLimits[jointIndex]:F2} ~ {jointMaxLimits[jointIndex]:F2})");
+        }
+
+        return clamped;
+    }
+
+    /// <summary>
+    /// 手動發送當前關節狀態（測試用）
+    /// </summary>
+    [ContextMenu("發送當前關節狀態")]
+    public void SendCurrentJointStates()
+    {
+        if (retarget == null)
+        {
+            Debug.LogWarning("⚠️ OpenArmRetarget 未設定");
+            return;
+        }
+
+        if (!isConnected)
+        {
+            Debug.LogWarning("⚠️ ROS2 未連接");
+            return;
+        }
+
+        SendRetargetJointsToROS2("left", retarget.left, leftJointNames);
+        SendRetargetJointsToROS2("right", retarget.right, rightJointNames);
+
+        Debug.Log("📤 已發送當前關節狀態到 ROS2");
+    }
+
+    /// <summary>
+    /// 顯示關節上下限資訊
+    /// </summary>
+    [ContextMenu("顯示關節上下限")]
+    public void ShowJointLimits()
+    {
+        Debug.Log("=== OpenArm 關節上下限（弧度）===");
+        for (int i = 0; i < jointMinLimits.Length; i++)
+        {
+            Debug.Log($"J{i + 1}: {jointMinLimits[i]:F2} ~ {jointMaxLimits[i]:F2} rad " +
+                     $"({jointMinLimits[i] * Mathf.Rad2Deg:F1}° ~ {jointMaxLimits[i] * Mathf.Rad2Deg:F1}°)");
+        }
     }
 
     #endregion
