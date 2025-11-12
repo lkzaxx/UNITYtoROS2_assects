@@ -364,8 +364,34 @@ public class OpenArmController : MonoBehaviour
     {
         if (tcpManager != null)
         {
-            tcpManager.PublishGripperCommand(command, position);
-            Debug.Log($"📤 OpenArmController: 發送夾爪命令: {command}");
+            // Map legacy gripper commands to JointState (L_EE, R_EE) over /unity/joint_commands
+            float min = tcpManager.gripperMin;
+            float max = tcpManager.gripperMax;
+            float target;
+
+            if (command == "open")
+            {
+                target = max;
+            }
+            else if (command == "close")
+            {
+                target = min;
+            }
+            else
+            {
+                // Interpret position as absolute meters; clamp to valid stroke
+                target = Mathf.Clamp(position, min, max);
+            }
+
+            string leftName = tcpManager.leftEEName;
+            string rightName = tcpManager.rightEEName;
+
+            tcpManager.PublishJointCommands(
+                new string[] { leftName, rightName },
+                new float[] { target, target }
+            );
+
+            Debug.Log($"📤 OpenArmController: 發送夾爪 JointState → {leftName}={target:F4} m, {rightName}={target:F4} m");
         }
         else
         {

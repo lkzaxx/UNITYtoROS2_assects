@@ -85,6 +85,34 @@
                     "isPartOfComposite": false
                 }
             ]
+        },
+        {
+            "name": "LeftCalibrate",
+            "id": "2e554a3f-473c-425f-b522-e9e02000b3d2",
+            "actions": [
+                {
+                    "name": "New action",
+                    "type": "Button",
+                    "id": "3b4c7673-89cf-4375-97ee-342d29e53e99",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "a0d54443-6682-4f3f-a0af-7ec2939ac88a",
+                    "path": "<XRController>{LeftHand}/grip",
+                    "interactions": "Hold(duration=0.6,pressPoint=0.7)",
+                    "processors": "",
+                    "groups": "",
+                    "action": "New action",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
         }
     ],
     "controlSchemes": []

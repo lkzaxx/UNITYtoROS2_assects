@@ -29,7 +29,6 @@ public class ROSTCPManager : MonoBehaviour
     public string jointCommandsTopic = "/unity/joint_commands";
     public string unityPoseTopic = "/unity/pose";
     public string cmdVelTopic = "/openarm/cmd_vel";
-    public string gripperCommandTopic = "/openarm/gripper_command";
 
     [Header("OpenArm Retarget 自動發送")]
     public OpenArmRetarget retarget;                 // OpenArmRetarget 引用
@@ -200,14 +199,12 @@ public class ROSTCPManager : MonoBehaviour
             ros.RegisterPublisher<JointStateMsg>(jointCommandsTopic);
             ros.RegisterPublisher<PoseStampedMsg>(unityPoseTopic);
             ros.RegisterPublisher<TwistMsg>(cmdVelTopic);
-            ros.RegisterPublisher<StringMsg>(gripperCommandTopic);
 
             Debug.Log("✅ 註冊所有發布者完成");
             Debug.Log($"   - 心跳: {heartbeatTopic}");
             Debug.Log($"   - 關節命令: {jointCommandsTopic}");
             Debug.Log($"   - Unity位置: {unityPoseTopic}");
             Debug.Log($"   - 速度命令: {cmdVelTopic}");
-            Debug.Log($"   - 夾爪命令: {gripperCommandTopic}");
         }
         catch (System.Exception ex)
         {
@@ -568,31 +565,6 @@ public class ROSTCPManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 發送夾爪命令
-    /// </summary>
-    public void PublishGripperCommand(string command, float position = 0.0f)
-    {
-        if (ros == null)
-        {
-            Debug.LogError("❌ ROS 連接未初始化");
-            return;
-        }
-
-        try
-        {
-            var gripperMsg = new StringMsg { data = $"{command}:{position:F3}" };
-            ros.Publish(gripperCommandTopic, gripperMsg);
-            messagesSent++;
-
-            Debug.Log($"📤 發送夾爪命令: {command} (位置: {position:F3})");
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogError($"❌ 發送夾爪命令失敗: {ex.Message}");
-        }
-    }
-
-    /// <summary>
 		/// 從左右 GripperHoldToOpenPrismatic 讀取目標位置（公尺），並以 JointState 發送 (L_EE, R_EE)
     /// </summary>
 		void PublishGripperEEJointState()
@@ -723,18 +695,6 @@ public class ROSTCPManager : MonoBehaviour
         PublishUnityPose(testPos, testRot);
     }
 
-    [ContextMenu("測試夾爪開啟")]
-    public void TestGripperOpen()
-    {
-        PublishGripperCommand("open", 0.8f);
-    }
-
-    [ContextMenu("測試夾爪關閉")]
-    public void TestGripperClose()
-    {
-        PublishGripperCommand("close", 0.0f);
-    }
-
     [ContextMenu("驗證所有Topic配置")]
     public void VerifyTopicConfiguration()
     {
@@ -749,7 +709,6 @@ public class ROSTCPManager : MonoBehaviour
         Debug.Log($"  關節命令: {jointCommandsTopic}");
         Debug.Log($"  Unity位置: {unityPoseTopic}");
         Debug.Log($"  速度命令: {cmdVelTopic}");
-        Debug.Log($"  夾爪命令: {gripperCommandTopic}");
     }
 
     #endregion
@@ -819,16 +778,6 @@ public class ROSTCPManager : MonoBehaviour
         if (GUILayout.Button("測試位置"))
         {
             TestUnityPose();
-        }
-
-        if (GUILayout.Button("夾爪開"))
-        {
-            TestGripperOpen();
-        }
-
-        if (GUILayout.Button("夾爪關"))
-        {
-            TestGripperClose();
         }
         GUILayout.EndHorizontal();
 
