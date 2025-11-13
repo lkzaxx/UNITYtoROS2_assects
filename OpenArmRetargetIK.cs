@@ -398,27 +398,23 @@ public class OpenArmRetargetIK : MonoBehaviour
             return config.smoothedPosition;
         }
 
-        // 2. 計算人體手腕相對於肩膀的向量（世界座標）
+        // 2. 計算人體手臂向量（世界座標）
         Vector3 humanShoulderPos = config.shoulderReference != null
             ? config.shoulderReference.position
             : config.wristTarget.position;
         Vector3 humanWristPos = config.wristTarget.position;
-        Vector3 humanArmVector = humanWristPos - humanShoulderPos;
+        Vector3 humanArmVectorWorld = humanWristPos - humanShoulderPos;
 
-        // 3. 套用統一縮放
-        Vector3 scaledArmVector = humanArmVector * config.uniformScale;
+        // ✅ 修正：將人體手臂向量轉換到機械臂的局部座標系
+        Vector3 humanArmVectorLocal = robotBase.InverseTransformDirection(humanArmVectorWorld);
 
-        // 4. ✅ 修正：計算機械臂目標的世界位置
-        Vector3 robotBaseWorldPos = robotBase.position;
-        Vector3 robotTargetWorldPos = robotBaseWorldPos + scaledArmVector;
+        // 3. 套用統一縮放（在局部座標系中）
+        Vector3 scaledArmVectorLocal = humanArmVectorLocal * config.uniformScale;
 
-        // 5. ✅ 修正：轉換到機械臂基座的局部座標（使用 InverseTransformPoint）
-        Vector3 localTarget = robotBase.InverseTransformPoint(robotTargetWorldPos);
+        // 4. 套用末端執行器偏移（在局部座標系中）
+        Vector3 localTarget = scaledArmVectorLocal + config.endEffectorOffset;
 
-        // 6. 套用末端執行器偏移（在局部座標系中）
-        localTarget += config.endEffectorOffset;
-
-        // 7. 約束檢查（在局部座標系中）
+        // 5. 約束檢查（在局部座標系中）
         if (config.usePositionConstraint)
         {
             localTarget.x = Mathf.Clamp(localTarget.x, config.constraintMin.x, config.constraintMax.x);
@@ -426,10 +422,10 @@ public class OpenArmRetargetIK : MonoBehaviour
             localTarget.z = Mathf.Clamp(localTarget.z, config.constraintMin.z, config.constraintMax.z);
         }
 
-        // 8. 轉回世界座標
+        // 6. 轉回世界座標
         Vector3 finalTargetWorldPos = robotBase.TransformPoint(localTarget);
 
-        // 9. 平滑處理
+        // 7. 平滑處理
         if (!config.isInitialized || deltaTime <= 0f)
         {
             config.smoothedPosition = finalTargetWorldPos;
@@ -437,13 +433,24 @@ public class OpenArmRetargetIK : MonoBehaviour
         }
         else
         {
-            // positionSmooth: 0=不動, 1=立即追蹤
             float smoothFactor = Mathf.Clamp01(config.positionSmooth);
             config.smoothedPosition = Vector3.Lerp(
                 config.smoothedPosition,
                 finalTargetWorldPos,
                 smoothFactor
             );
+        }
+
+        // 🔍 調試輸出
+        if (showDebugInfo && Time.frameCount % 60 == 0)
+        {
+            Debug.Log($"=== IK 目標計算 ===");
+            Debug.Log($"人體臂向量(世界): {humanArmVectorWorld}");
+            Debug.Log($"人體臂向量(局部): {humanArmVectorLocal}");
+            Debug.Log($"縮放後(局部): {scaledArmVectorLocal}");
+            Debug.Log($"約束後(局部): {localTarget}");
+            Debug.Log($"最終目標(世界): {finalTargetWorldPos}");
+            Debug.Log($"機械臂基座: {robotBase.position}");
         }
 
         return config.smoothedPosition;
