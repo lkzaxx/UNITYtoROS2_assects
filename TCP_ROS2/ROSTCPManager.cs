@@ -1336,125 +1336,187 @@ public class ROSTCPManager : MonoBehaviour
         rect.anchoredPosition = anchoredPosition;
     }
 
-    /// <summary>
-    /// 創建文字標籤
-    /// </summary>
-    GameObject CreateTextLabel(Transform parent, string name, string text,
-        Vector2 position, Vector2 size, int fontSize, TextAlignmentOptions alignment)
+/// <summary>
+/// 創建文字標籤（修正 TMP 字體問題）
+/// </summary>
+GameObject CreateTextLabel(Transform parent, string name, string text,
+    Vector2 position, Vector2 size, int fontSize, TextAlignmentOptions alignment)
+{
+    GameObject labelObj = CreateUIElement(name, parent);
+
+    TextMeshProUGUI textComp = labelObj.AddComponent<TextMeshProUGUI>();
+    textComp.text = text;
+    textComp.fontSize = fontSize;
+    textComp.alignment = alignment;
+    textComp.color = Color.white;
+    
+    // 🔥 關鍵修正：確保載入 TMP 字體
+    if (TMP_Settings.defaultFontAsset != null)
     {
-        GameObject labelObj = CreateUIElement(name, parent);
-
-        TextMeshProUGUI textComp = labelObj.AddComponent<TextMeshProUGUI>();
-        textComp.text = text;
-        textComp.fontSize = fontSize;
-        textComp.alignment = alignment;
-        textComp.color = Color.white;
-        // 使用系統默認字體，避免顯示方塊
-        if (TMP_Settings.defaultFontAsset != null)
+        textComp.font = TMP_Settings.defaultFontAsset;
+    }
+    else
+    {
+        // 嘗試載入 TMP 內建字體
+        TMP_FontAsset tmpFont = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+        if (tmpFont == null)
         {
-            textComp.font = TMP_Settings.defaultFontAsset;
+            tmpFont = Resources.Load<TMP_FontAsset>("TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF");
         }
-
-        SetRectTransform(labelObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
-
-        return labelObj;
+        if (tmpFont != null)
+        {
+            textComp.font = tmpFont;
+        }
+        else
+        {
+            Debug.LogWarning("⚠️ 找不到 TextMeshPro 字體資源，請導入 TMP Essentials");
+        }
     }
 
-    /// <summary>
-    /// 創建輸入框
-    /// </summary>
-    GameObject CreateInputField(Transform parent, string name,
-        Vector2 position, Vector2 size, string placeholderText)
+    SetRectTransform(labelObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
+
+    return labelObj;
+}
+
+
+/// <summary>
+/// 載入 TextMeshPro 字體（解決藍色框 T 字問題）
+/// </summary>
+void LoadTMPFont(TextMeshProUGUI textComponent)
+{
+    if (textComponent == null) return;
+
+    // 優先使用默認字體
+    if (TMP_Settings.defaultFontAsset != null)
     {
-        GameObject inputObj = CreateUIElement(name, parent);
-
-        Image bgImage = inputObj.AddComponent<Image>();
-        bgImage.color = new Color(0.2f, 0.2f, 0.2f, 1f);
-
-        TMP_InputField inputField = inputObj.AddComponent<TMP_InputField>();
-        SetRectTransform(inputObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
-
-        // 創建文字區域
-        GameObject textArea = CreateUIElement("TextArea", inputObj.transform);
-        RectTransform textAreaRect = textArea.AddComponent<RectTransform>();
-        SetRectTransform(textArea, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-
-        // 創建文字組件
-        GameObject textObj = CreateUIElement("Text", textArea.transform);
-        TextMeshProUGUI textComp = textObj.AddComponent<TextMeshProUGUI>();
-        textComp.text = "";
-        textComp.fontSize = 24;
-        textComp.color = Color.white;
-        textComp.alignment = TextAlignmentOptions.MidlineLeft;
-        // 使用系統默認字體，避免顯示方塊
-        if (TMP_Settings.defaultFontAsset != null)
-        {
-            textComp.font = TMP_Settings.defaultFontAsset;
-        }
-
-        RectTransform textRect = textObj.GetComponent<RectTransform>();
-        SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        textRect.offsetMin = new Vector2(10, 5);
-        textRect.offsetMax = new Vector2(-10, -5);
-
-        // 創建佔位符
-        GameObject placeholderObj = CreateUIElement("Placeholder", textArea.transform);
-        TextMeshProUGUI placeholderComp = placeholderObj.AddComponent<TextMeshProUGUI>();
-        placeholderComp.text = placeholderText;
-        placeholderComp.fontSize = 24;
-        placeholderComp.color = new Color(0.5f, 0.5f, 0.5f, 1f);
-        placeholderComp.alignment = TextAlignmentOptions.MidlineLeft;
-        // 使用系統默認字體，避免顯示方塊
-        if (TMP_Settings.defaultFontAsset != null)
-        {
-            placeholderComp.font = TMP_Settings.defaultFontAsset;
-        }
-
-        RectTransform placeholderRect = placeholderObj.GetComponent<RectTransform>();
-        SetRectTransform(placeholderObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        placeholderRect.offsetMin = new Vector2(10, 5);
-        placeholderRect.offsetMax = new Vector2(-10, -5);
-
-        // 設置 InputField
-        inputField.textViewport = textAreaRect;
-        inputField.textComponent = textComp;
-        inputField.placeholder = placeholderComp;
-
-        return inputObj;
+        textComponent.font = TMP_Settings.defaultFontAsset;
+        return;
     }
 
-    /// <summary>
-    /// 創建按鈕
-    /// </summary>
-    Button CreateButton(Transform parent, string name, string text,
-        Vector2 position, Vector2 size, UnityEngine.Events.UnityAction onClick)
+    // 嘗試載入常見的 TMP 字體路徑
+    string[] fontPaths = new string[]
     {
-        GameObject buttonObj = CreateUIElement(name, parent);
+        "Fonts & Materials/LiberationSans SDF",
+        "TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF",
+        "TextMesh Pro/Fonts/LiberationSans SDF",
+        "TMP/Fonts/LiberationSans SDF"
+    };
 
-        Image buttonImage = buttonObj.AddComponent<Image>();
-        buttonImage.color = new Color(0.2f, 0.5f, 0.8f, 1f);
-
-        Button button = buttonObj.AddComponent<Button>();
-        button.onClick.AddListener(onClick);
-
-        // 創建按鈕文字
-        GameObject textObj = CreateUIElement("Text", buttonObj.transform);
-        TextMeshProUGUI textComp = textObj.AddComponent<TextMeshProUGUI>();
-        textComp.text = text;
-        textComp.fontSize = 24;
-        textComp.color = Color.white;
-        textComp.alignment = TextAlignmentOptions.Center;
-        // 使用系統默認字體，避免顯示方塊
-        if (TMP_Settings.defaultFontAsset != null)
+    foreach (string path in fontPaths)
+    {
+        TMP_FontAsset font = Resources.Load<TMP_FontAsset>(path);
+        if (font != null)
         {
-            textComp.font = TMP_Settings.defaultFontAsset;
+            textComponent.font = font;
+            Debug.Log($"✅ 成功載入 TMP 字體: {path}");
+            return;
         }
-
-        SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        SetRectTransform(buttonObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
-
-        return button;
     }
+
+    // 如果還是找不到，嘗試查找任何可用的 TMP 字體
+    TMP_FontAsset[] allFonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
+    if (allFonts.Length > 0)
+    {
+        textComponent.font = allFonts[0];
+        Debug.Log($"✅ 使用找到的 TMP 字體: {allFonts[0].name}");
+        return;
+    }
+
+    Debug.LogError("❌ 找不到任何 TextMeshPro 字體！請執行以下步驟：\n" +
+                   "1. Window > TextMeshPro > Import TMP Essential Resources\n" +
+                   "2. 或手動添加 TMP 字體到 Resources 資料夾");
+}
+
+
+/// <summary>
+/// 創建輸入框（修正 TMP 字體問題）
+/// </summary>
+GameObject CreateInputField(Transform parent, string name,
+    Vector2 position, Vector2 size, string placeholderText)
+{
+    GameObject inputObj = CreateUIElement(name, parent);
+
+    Image bgImage = inputObj.AddComponent<Image>();
+    bgImage.color = new Color(0.2f, 0.2f, 0.2f, 1f);
+
+    TMP_InputField inputField = inputObj.AddComponent<TMP_InputField>();
+    SetRectTransform(inputObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
+
+    // 創建文字區域
+    GameObject textArea = CreateUIElement("TextArea", inputObj.transform);
+    RectTransform textAreaRect = textArea.AddComponent<RectTransform>();
+    SetRectTransform(textArea, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+    // 創建文字組件
+    GameObject textObj = CreateUIElement("Text", textArea.transform);
+    TextMeshProUGUI textComp = textObj.AddComponent<TextMeshProUGUI>();
+    textComp.text = "";
+    textComp.fontSize = 24;
+    textComp.color = Color.white;
+    textComp.alignment = TextAlignmentOptions.MidlineLeft;
+    
+    // 🔥 關鍵修正：載入字體
+    LoadTMPFont(textComp);
+
+    RectTransform textRect = textObj.GetComponent<RectTransform>();
+    SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+    textRect.offsetMin = new Vector2(10, 5);
+    textRect.offsetMax = new Vector2(-10, -5);
+
+    // 創建佔位符
+    GameObject placeholderObj = CreateUIElement("Placeholder", textArea.transform);
+    TextMeshProUGUI placeholderComp = placeholderObj.AddComponent<TextMeshProUGUI>();
+    placeholderComp.text = placeholderText;
+    placeholderComp.fontSize = 24;
+    placeholderComp.color = new Color(0.5f, 0.5f, 0.5f, 1f);
+    placeholderComp.alignment = TextAlignmentOptions.MidlineLeft;
+    
+    // 🔥 載入字體
+    LoadTMPFont(placeholderComp);
+
+    RectTransform placeholderRect = placeholderObj.GetComponent<RectTransform>();
+    SetRectTransform(placeholderObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+    placeholderRect.offsetMin = new Vector2(10, 5);
+    placeholderRect.offsetMax = new Vector2(-10, -5);
+
+    // 設置 InputField
+    inputField.textViewport = textAreaRect;
+    inputField.textComponent = textComp;
+    inputField.placeholder = placeholderComp;
+
+    return inputObj;
+}
+
+/// <summary>
+/// 創建按鈕（修正字體問題）
+/// </summary>
+Button CreateButton(Transform parent, string name, string text,
+    Vector2 position, Vector2 size, UnityEngine.Events.UnityAction onClick)
+{
+    GameObject buttonObj = CreateUIElement(name, parent);
+
+    Image buttonImage = buttonObj.AddComponent<Image>();
+    buttonImage.color = new Color(0.2f, 0.5f, 0.8f, 1f);
+
+    Button button = buttonObj.AddComponent<Button>();
+    button.onClick.AddListener(onClick);
+
+    // 創建按鈕文字
+    GameObject textObj = CreateUIElement("Text", buttonObj.transform);
+    TextMeshProUGUI textComp = textObj.AddComponent<TextMeshProUGUI>();
+    textComp.text = text;
+    textComp.fontSize = 24;
+    textComp.color = Color.white;
+    textComp.alignment = TextAlignmentOptions.Center;
+    
+    // 🔥 載入字體
+    LoadTMPFont(textComp);
+
+    SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+    SetRectTransform(buttonObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
+
+    return button;
+}
 
     /// <summary>
     /// 自動配置 XR Ray Interactor
@@ -1638,89 +1700,20 @@ public class ROSTCPManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 修復虛擬鍵盤的字体問題（將 TextMeshPro 轉換為 Unity Text）
-    /// </summary>
-    void FixVirtualKeyboardFonts(GameObject keyboardObj)
+/// <summary>
+/// 修復虛擬鍵盤的字體問題
+/// </summary>
+void FixVirtualKeyboardFonts(GameObject keyboardObj)
+{
+    TextMeshProUGUI[] tmpComponents = keyboardObj.GetComponentsInChildren<TextMeshProUGUI>(true);
+    foreach (var tmpComp in tmpComponents)
     {
-        // 獲取 Unity 默認字体
-        Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        if (defaultFont == null)
+        if (tmpComp != null)
         {
-            defaultFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        }
-
-        // 查找所有 TextMeshPro 組件並轉換為 Unity Text
-        TextMeshProUGUI[] tmpComponents = keyboardObj.GetComponentsInChildren<TextMeshProUGUI>(true);
-        foreach (var tmpComp in tmpComponents)
-        {
-            if (tmpComp == null) continue;
-
-            // 保存文字內容和設置
-            string text = tmpComp.text;
-            int fontSize = (int)tmpComp.fontSize;
-            Color textColor = tmpComp.color;
-            TextAlignmentOptions alignment = tmpComp.alignment;
-
-            // 獲取父對象
-            GameObject parentObj = tmpComp.gameObject;
-            Transform parentTransform = parentObj.transform.parent;
-
-            // 創建新的 Unity Text 對象
-            GameObject textObj = new GameObject("Text");
-            textObj.transform.SetParent(parentTransform, false);
-
-            // 複製 RectTransform 設置
-            RectTransform tmpRect = tmpComp.GetComponent<RectTransform>();
-            RectTransform newRect = textObj.AddComponent<RectTransform>();
-            if (tmpRect != null)
-            {
-                newRect.anchorMin = tmpRect.anchorMin;
-                newRect.anchorMax = tmpRect.anchorMax;
-                newRect.sizeDelta = tmpRect.sizeDelta;
-                newRect.anchoredPosition = tmpRect.anchoredPosition;
-                newRect.offsetMin = tmpRect.offsetMin;
-                newRect.offsetMax = tmpRect.offsetMax;
-            }
-
-            // 添加 Unity Text 組件
-            Text unityText = textObj.AddComponent<Text>();
-            unityText.text = text;
-            unityText.fontSize = fontSize;
-            unityText.color = textColor;
-
-            // 轉換對齊方式
-            switch (alignment)
-            {
-                case TextAlignmentOptions.Center:
-                case TextAlignmentOptions.Midline:
-                    unityText.alignment = TextAnchor.MiddleCenter;
-                    break;
-                case TextAlignmentOptions.Left:
-                case TextAlignmentOptions.MidlineLeft:
-                    unityText.alignment = TextAnchor.MiddleLeft;
-                    break;
-                case TextAlignmentOptions.Right:
-                case TextAlignmentOptions.MidlineRight:
-                    unityText.alignment = TextAnchor.MiddleRight;
-                    break;
-                default:
-                    unityText.alignment = TextAnchor.MiddleCenter;
-                    break;
-            }
-
-            // 設置字体
-            if (defaultFont != null)
-            {
-                unityText.font = defaultFont;
-            }
-
-            // 刪除舊的 TextMeshPro 組件
-            DestroyImmediate(tmpComp);
-
-            Debug.Log($"✅ 已將 {parentObj.name} 的 TextMeshPro 轉換為 Unity Text");
+            LoadTMPFont(tmpComp);
         }
     }
+}
 
     /// <summary>
     /// 創建簡單的虛擬鍵盤（如果沒有 Prefab）
