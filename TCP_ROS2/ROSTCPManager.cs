@@ -47,19 +47,19 @@ public class ROSTCPManager : MonoBehaviour
         "R_J1", "R_J2", "R_J3", "R_J4", "R_J5", "R_J6", "R_J7"
     };
 
-		[Header("Gripper (Prismatic) → JointState")]
-		[Tooltip("左手夾爪（GripperHoldToOpenPrismatic）")]
-		public GripperHoldToOpenPrismatic leftGripper;
-		[Tooltip("右手夾爪（GripperHoldToOpenPrismatic）")]
-		public GripperHoldToOpenPrismatic rightGripper;
-		public bool autoSendGripperEE = true;            // 是否自動發送 L_EE/R_EE
-		public float gripperSendInterval = 0.05f;        // 發送間隔（秒）
-		[Tooltip("夾爪 JointState 名稱")]
-		public string leftEEName = "L_EE";
-		public string rightEEName = "R_EE";
-		[Tooltip("夾爪行程限制（公尺）")]
-		public float gripperMin = 0f;
-		public float gripperMax = 0.0425f;
+    [Header("Gripper (Prismatic) → JointState")]
+    [Tooltip("左手夾爪（GripperHoldToOpenPrismatic）")]
+    public GripperHoldToOpenPrismatic leftGripper;
+    [Tooltip("右手夾爪（GripperHoldToOpenPrismatic）")]
+    public GripperHoldToOpenPrismatic rightGripper;
+    public bool autoSendGripperEE = true;            // 是否自動發送 L_EE/R_EE
+    public float gripperSendInterval = 0.05f;        // 發送間隔（秒）
+    [Tooltip("夾爪 JointState 名稱")]
+    public string leftEEName = "L_EE";
+    public string rightEEName = "R_EE";
+    [Tooltip("夾爪行程限制（公尺）")]
+    public float gripperMin = 0f;
+    public float gripperMax = 0.0425f;
 
     [Header("狀態顯示")]
     public bool isConnected = false;
@@ -150,13 +150,13 @@ public class ROSTCPManager : MonoBehaviour
     void Start()
     {
         Debug.Log("🚀 ROSTCPManager 啟動...");
-        
+
         // 初始化 IP 配置界面
         if (showIPConfigUI)
         {
             InitializeIPConfigUI();
         }
-        
+
         StartCoroutine(DelayedInitialization());
     }
 
@@ -392,7 +392,7 @@ public class ROSTCPManager : MonoBehaviour
         {
             var pos = poseMsg.pose.position;
             var rot = poseMsg.pose.orientation;
-            
+
             Debug.Log($"📥 收到末端執行器位置: Pos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}) " +
                      $"Rot({rot.x:F3}, {rot.y:F3}, {rot.z:F3}, {rot.w:F3})");
 
@@ -407,7 +407,7 @@ public class ROSTCPManager : MonoBehaviour
         lastMessageTime = Time.time;
 
         Debug.Log($"📥 收到心跳回音: {echoMsg.data}");
-        
+
         // 心跳回音確認連接正常
         isConnected = true;
     }
@@ -572,7 +572,7 @@ public class ROSTCPManager : MonoBehaviour
         try
         {
             var poseMsg = new PoseStampedMsg();
-            
+
             // 設定訊息標頭
             var now = System.DateTimeOffset.Now;
             poseMsg.header = new HeaderMsg();
@@ -599,14 +599,14 @@ public class ROSTCPManager : MonoBehaviour
     }
 
     /// <summary>
-		/// 從左右 GripperHoldToOpenPrismatic 讀取目標位置（公尺），並以 JointState 發送 (L_EE, R_EE)
+    /// 從左右 GripperHoldToOpenPrismatic 讀取目標位置（公尺），並以 JointState 發送 (L_EE, R_EE)
     /// </summary>
-		void PublishGripperEEJointState()
+    void PublishGripperEEJointState()
     {
-			if (ros == null) return;
+        if (ros == null) return;
 
-			float left = GetJawTargetMeters(leftGripper, leftGripper != null ? leftGripper.leftJaw : null);
-			float right = GetJawTargetMeters(rightGripper, rightGripper != null ? rightGripper.leftJaw : null);
+        float left = GetJawTargetMeters(leftGripper, leftGripper != null ? leftGripper.leftJaw : null);
+        float right = GetJawTargetMeters(rightGripper, rightGripper != null ? rightGripper.leftJaw : null);
 
         // 夾爪行程限制（0 ~ 0.0425 m）
         left = Mathf.Clamp(left, gripperMin, gripperMax);
@@ -640,12 +640,12 @@ public class ROSTCPManager : MonoBehaviour
     }
 
     /// <summary>
-		/// 根據 gripper 設定的軸向，讀取 ArticulationBody 對應 Drive 的 target（公尺）
+    /// 根據 gripper 設定的軸向，讀取 ArticulationBody 對應 Drive 的 target（公尺）
     /// </summary>
-		float GetJawTargetMeters(GripperHoldToOpenPrismatic gripperRef, ArticulationBody jaw)
+    float GetJawTargetMeters(GripperHoldToOpenPrismatic gripperRef, ArticulationBody jaw)
     {
-			if (jaw == null || gripperRef == null) return 0f;
-			switch (gripperRef.axis)
+        if (jaw == null || gripperRef == null) return 0f;
+        switch (gripperRef.axis)
         {
             case GripperHoldToOpenPrismatic.Axis.X:
                 return jaw.xDrive.target;
@@ -690,7 +690,7 @@ public class ROSTCPManager : MonoBehaviour
         Debug.Log("=== ROS TCP 連接診斷 ===");
         Debug.Log($"ROS IP: {rosIPAddress}:{rosPort}");
         Debug.Log($"ROS Connection Instance: {(ros != null ? "存在" : "null")}");
-        
+
         if (ros != null)
         {
             Debug.Log($"Has Connection Thread: {ros.HasConnectionThread}");
@@ -698,14 +698,14 @@ public class ROSTCPManager : MonoBehaviour
             Debug.Log($"接收訊息數: {messagesReceived}");
             Debug.Log($"最後訊息時間: {(Time.time - lastMessageTime):F1}秒前");
         }
-        
+
         Debug.Log("=== Topic 配置 ===");
         Debug.Log($"心跳 Topic: {heartbeatTopic}");
         Debug.Log($"系統狀態 Topic: {openarmStatusTopic}");
         Debug.Log($"關節命令 Topic: {jointCommandsTopic}");
         Debug.Log($"關節狀態 Topic: {jointStatesTopic}");
         Debug.Log($"速度命令 Topic: {cmdVelTopic}");
-        
+
         Debug.Log("=== 建議檢查 ===");
         Debug.Log("1. 確認 ROS2 ros_tcp_bridge 正在運行");
         Debug.Log("2. 檢查 ROS2 節點是否發布到正確的 topics");
@@ -738,7 +738,7 @@ public class ROSTCPManager : MonoBehaviour
         Debug.Log($"  關節狀態: {jointStatesTopic}");
         Debug.Log($"  末端執行器位置: {endEffectorPoseTopic}");
         Debug.Log($"  系統狀態: {openarmStatusTopic}");
-        
+
         Debug.Log("發送端 (Unity → ROS2):");
         Debug.Log($"  關節命令: {jointCommandsTopic}");
         Debug.Log($"  Unity位置: {unityPoseTopic}");
@@ -840,8 +840,8 @@ public class ROSTCPManager : MonoBehaviour
         // 面板位置和大小（左下角）
         float panelX = 10;
         float panelY = Screen.height - 290;
-			float panelWidth = 820;  // 增加寬度以容納兩列
-			float panelHeight = 310; // 增加高度以容納夾爪顯示
+        float panelWidth = 820;  // 增加寬度以容納兩列
+        float panelHeight = 310; // 增加高度以容納夾爪顯示
 
         GUILayout.BeginArea(new Rect(panelX, panelY, panelWidth, panelHeight));
 
@@ -850,47 +850,47 @@ public class ROSTCPManager : MonoBehaviour
         GUILayout.Label("OpenArm 關節角度監控", GUI.skin.box);
         GUI.color = Color.white;
 
-			// 夾爪顯示（置於面板上方區域）
-			GUILayout.BeginVertical(GUILayout.Width(panelWidth - 20));
-			GUILayout.Label("夾爪 (Grippers):", EditorGUIStyle());
-			{
-				// 左夾爪
-				if (leftGripper != null && leftGripper.leftJaw != null)
-				{
-					float leftMeters = GetJawTargetMeters(leftGripper, leftGripper.leftJaw);
-					bool leftOut = leftMeters < gripperMin - 1e-5f || leftMeters > gripperMax + 1e-5f;
-					float leftClamped = Mathf.Clamp(leftMeters, gripperMin, gripperMax);
-					GUI.color = leftOut ? Color.red : Color.green;
-					GUILayout.Label($"  {leftEEName} = {leftClamped,6:F4} m {(leftOut ? "[超出範圍]" : "")}");
-					GUI.color = Color.white;
-				}
-				else
-				{
-					GUI.color = Color.gray;
-					GUILayout.Label($"  {leftEEName} = 未設定");
-					GUI.color = Color.white;
-				}
+        // 夾爪顯示（置於面板上方區域）
+        GUILayout.BeginVertical(GUILayout.Width(panelWidth - 20));
+        GUILayout.Label("夾爪 (Grippers):", EditorGUIStyle());
+        {
+            // 左夾爪
+            if (leftGripper != null && leftGripper.leftJaw != null)
+            {
+                float leftMeters = GetJawTargetMeters(leftGripper, leftGripper.leftJaw);
+                bool leftOut = leftMeters < gripperMin - 1e-5f || leftMeters > gripperMax + 1e-5f;
+                float leftClamped = Mathf.Clamp(leftMeters, gripperMin, gripperMax);
+                GUI.color = leftOut ? Color.red : Color.green;
+                GUILayout.Label($"  {leftEEName} = {leftClamped,6:F4} m {(leftOut ? "[超出範圍]" : "")}");
+                GUI.color = Color.white;
+            }
+            else
+            {
+                GUI.color = Color.gray;
+                GUILayout.Label($"  {leftEEName} = 未設定");
+                GUI.color = Color.white;
+            }
 
-				// 右夾爪
-				if (rightGripper != null && rightGripper.leftJaw != null)
-				{
-					float rightMeters = GetJawTargetMeters(rightGripper, rightGripper.leftJaw);
-					bool rightOut = rightMeters < gripperMin - 1e-5f || rightMeters > gripperMax + 1e-5f;
-					float rightClamped = Mathf.Clamp(rightMeters, gripperMin, gripperMax);
-					GUI.color = rightOut ? Color.red : Color.green;
-					GUILayout.Label($"  {rightEEName} = {rightClamped,6:F4} m {(rightOut ? "[超出範圍]" : "")}");
-					GUI.color = Color.white;
-				}
-				else
-				{
-					GUI.color = Color.gray;
-					GUILayout.Label($"  {rightEEName} = 未設定");
-					GUI.color = Color.white;
-				}
-			}
-			GUILayout.EndVertical();
+            // 右夾爪
+            if (rightGripper != null && rightGripper.leftJaw != null)
+            {
+                float rightMeters = GetJawTargetMeters(rightGripper, rightGripper.leftJaw);
+                bool rightOut = rightMeters < gripperMin - 1e-5f || rightMeters > gripperMax + 1e-5f;
+                float rightClamped = Mathf.Clamp(rightMeters, gripperMin, gripperMax);
+                GUI.color = rightOut ? Color.red : Color.green;
+                GUILayout.Label($"  {rightEEName} = {rightClamped,6:F4} m {(rightOut ? "[超出範圍]" : "")}");
+                GUI.color = Color.white;
+            }
+            else
+            {
+                GUI.color = Color.gray;
+                GUILayout.Label($"  {rightEEName} = 未設定");
+                GUI.color = Color.white;
+            }
+        }
+        GUILayout.EndVertical();
 
-			GUILayout.Space(4);
+        GUILayout.Space(4);
 
         // 並排顯示左右臂
         GUILayout.BeginHorizontal();
@@ -907,7 +907,7 @@ public class ROSTCPManager : MonoBehaviour
                     var drive = retarget.left[i].joint.xDrive;
                     float angleDeg = drive.target;
                     float angleRad = angleDeg * Mathf.Deg2Rad;
-                    
+
                     // 檢查是否超出範圍
                     bool outOfRange = false;
                     string rangeStatus = "";
@@ -924,7 +924,7 @@ public class ROSTCPManager : MonoBehaviour
                             rangeStatus = " [高於上限]";
                         }
                     }
-                    
+
                     GUI.color = outOfRange ? Color.red : Color.green;
                     GUILayout.Label($"  L_J{i + 1} = {angleDeg,7:F2}° ({angleRad,6:F3} rad){rangeStatus}");
                     GUI.color = Color.white;
@@ -955,7 +955,7 @@ public class ROSTCPManager : MonoBehaviour
                     var drive = retarget.right[i].joint.xDrive;
                     float angleDeg = drive.target;
                     float angleRad = angleDeg * Mathf.Deg2Rad;
-                    
+
                     // 檢查是否超出範圍
                     bool outOfRange = false;
                     string rangeStatus = "";
@@ -972,7 +972,7 @@ public class ROSTCPManager : MonoBehaviour
                             rangeStatus = " [高於上限]";
                         }
                     }
-                    
+
                     GUI.color = outOfRange ? Color.red : Color.green;
                     GUILayout.Label($"  R_J{i + 1} = {angleDeg,7:F2}° ({angleRad,6:F3} rad){rangeStatus}");
                     GUI.color = Color.white;
@@ -1023,11 +1023,11 @@ public class ROSTCPManager : MonoBehaviour
         }
 
         // 自動發送夾爪 L_EE / R_EE
-			if (autoSendGripperEE && (leftGripper != null || rightGripper != null) && isConnected && ros != null)
+        if (autoSendGripperEE && (leftGripper != null || rightGripper != null) && isConnected && ros != null)
         {
             if (Time.time - lastGripperSendTime >= gripperSendInterval)
             {
-					PublishGripperEEJointState();
+                PublishGripperEEJointState();
                 lastGripperSendTime = Time.time;
             }
         }
@@ -1159,20 +1159,20 @@ public class ROSTCPManager : MonoBehaviour
             // 否則動態創建
             CreateIPConfigUI();
         }
-        
+
         // 初始化臨時值
         tempIPAddress = rosIPAddress;
         tempPort = rosPort;
-        
+
         // 更新界面顯示
         UpdateIPConfigUI();
-        
+
         // 在 Play 模式下默認顯示界面
         if (ipConfigCanvasInstance != null)
         {
             ipConfigCanvasInstance.SetActive(true);
             isIPConfigUIVisible = true;
-            
+
             Debug.Log($"✅ IP 配置界面已創建並顯示");
             Debug.Log($"   位置: {ipConfigCanvasInstance.transform.position}");
             Debug.Log($"   縮放: {ipConfigCanvasInstance.transform.localScale}");
@@ -1197,7 +1197,7 @@ public class ROSTCPManager : MonoBehaviour
             if (inputs.Length > 0) ipAddressInputField = inputs[0];
             if (inputs.Length > 1) portInputField = inputs[1];
         }
-        
+
         Button[] buttons = ipConfigCanvasInstance.GetComponentsInChildren<Button>();
         foreach (Button btn in buttons)
         {
@@ -1209,9 +1209,9 @@ public class ROSTCPManager : MonoBehaviour
             else if (btnName.Contains("toggle") || btnName.Contains("顯示") || btnName.Contains("隱藏"))
                 toggleButton = btn;
         }
-        
+
         virtualKeyboard = ipConfigCanvasInstance.GetComponentInChildren<VirtualKeyboard>();
-        
+
         // 綁定按鈕事件
         if (applyButton != null)
             applyButton.onClick.AddListener(OnApplyIPConfig);
@@ -1230,7 +1230,7 @@ public class ROSTCPManager : MonoBehaviour
         GameObject canvasObj = new GameObject("IPConfigCanvas");
         Canvas canvas = canvasObj.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
-        
+
         // 嘗試找到 XR Camera
         Camera xrCamera = Camera.main;
         if (xrCamera == null)
@@ -1238,15 +1238,15 @@ public class ROSTCPManager : MonoBehaviour
             xrCamera = FindFirstObjectByType<Camera>();
         }
         canvas.worldCamera = xrCamera;
-        
+
         // 添加 Canvas Scaler
         CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920, 1080);
-        
+
         // 添加 Graphic Raycaster（用於手柄射線交互）
         canvasObj.AddComponent<GraphicRaycaster>();
-        
+
         // 確保有 EventSystem（Unity UI 需要）
         if (FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
         {
@@ -1254,61 +1254,61 @@ public class ROSTCPManager : MonoBehaviour
             eventSystemObj.AddComponent<UnityEngine.EventSystems.EventSystem>();
             eventSystemObj.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
         }
-        
+
         // 自動配置 XR Ray Interactor（如果存在）
         ConfigureXRRayInteractors();
-        
+
         // 設置 Canvas 位置和縮放
         canvasObj.transform.position = uiPosition;
         canvasObj.transform.localScale = uiScale;
-        
+
         // 創建背景面板
         GameObject panel = CreateUIElement("Panel", canvasObj.transform);
         Image panelImage = panel.AddComponent<Image>();
         panelImage.color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
         SetRectTransform(panel, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        
+
         // 創建標題
-        CreateTextLabel(panel.transform, "Title", "ROS TCP Connection Config", 
+        CreateTextLabel(panel.transform, "Title", "ROS TCP Connection Config",
             new Vector2(0, 200), new Vector2(800, 60), 36, TextAlignmentOptions.Center);
-        
+
         // 創建 IP 地址標籤和輸入框
-        CreateTextLabel(panel.transform, "IPLabel", "IP Address:", 
+        CreateTextLabel(panel.transform, "IPLabel", "IP Address:",
             new Vector2(-250, 120), new Vector2(150, 40), 24, TextAlignmentOptions.Left);
-        
-        GameObject ipInputObj = CreateInputField(panel.transform, "IPInput", 
+
+        GameObject ipInputObj = CreateInputField(panel.transform, "IPInput",
             new Vector2(0, 120), new Vector2(400, 50), rosIPAddress);
         ipAddressInputField = ipInputObj.GetComponent<TMP_InputField>();
         ipAddressInputField.onSelect.AddListener((string value) => ShowVirtualKeyboard(ipAddressInputField));
-        
+
         // 創建端口標籤和輸入框
-        CreateTextLabel(panel.transform, "PortLabel", "Port:", 
+        CreateTextLabel(panel.transform, "PortLabel", "Port:",
             new Vector2(-250, 40), new Vector2(150, 40), 24, TextAlignmentOptions.Left);
-        
-        GameObject portInputObj = CreateInputField(panel.transform, "PortInput", 
+
+        GameObject portInputObj = CreateInputField(panel.transform, "PortInput",
             new Vector2(0, 40), new Vector2(200, 50), rosPort.ToString());
         portInputField = portInputObj.GetComponent<TMP_InputField>();
         portInputField.contentType = TMP_InputField.ContentType.IntegerNumber;
         portInputField.onSelect.AddListener((string value) => ShowVirtualKeyboard(portInputField));
-        
+
         // 創建按鈕
-        applyButton = CreateButton(panel.transform, "ApplyButton", "Apply", 
+        applyButton = CreateButton(panel.transform, "ApplyButton", "Apply",
             new Vector2(-100, -60), new Vector2(150, 50), OnApplyIPConfig);
-        
-        cancelButton = CreateButton(panel.transform, "CancelButton", "Cancel", 
+
+        cancelButton = CreateButton(panel.transform, "CancelButton", "Cancel",
             new Vector2(100, -60), new Vector2(150, 50), OnCancelIPConfig);
-        
+
         // 創建切換按鈕（用於顯示/隱藏界面）
-        toggleButton = CreateButton(panel.transform, "ToggleButton", "Show Config", 
+        toggleButton = CreateButton(panel.transform, "ToggleButton", "Show Config",
             new Vector2(0, -140), new Vector2(200, 50), OnToggleIPConfigUI);
-        
+
         // 添加 VR 交互支持
         AddVRInteractionSupport(ipInputObj);
         AddVRInteractionSupport(portInputObj);
         AddVRInteractionSupport(applyButton.gameObject);
         AddVRInteractionSupport(cancelButton.gameObject);
         AddVRInteractionSupport(toggleButton.gameObject);
-        
+
         ipConfigCanvasInstance = canvasObj;
     }
 
@@ -1325,7 +1325,7 @@ public class ROSTCPManager : MonoBehaviour
     /// <summary>
     /// 設置 RectTransform
     /// </summary>
-    void SetRectTransform(GameObject obj, Vector2 anchorMin, Vector2 anchorMax, 
+    void SetRectTransform(GameObject obj, Vector2 anchorMin, Vector2 anchorMax,
         Vector2 sizeDelta, Vector2 anchoredPosition)
     {
         RectTransform rect = obj.GetComponent<RectTransform>();
@@ -1337,122 +1337,104 @@ public class ROSTCPManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 創建文字標籤
+    /// 創建文字標籤（使用 Unity Text）
     /// </summary>
-    GameObject CreateTextLabel(Transform parent, string name, string text, 
-        Vector2 position, Vector2 size, int fontSize, TextAlignmentOptions alignment)
+    GameObject CreateTextLabel(Transform parent, string name, string text,
+        Vector2 position, Vector2 size, int fontSize, TextAnchor alignment)
     {
         GameObject labelObj = CreateUIElement(name, parent);
-        
-        TextMeshProUGUI textComp = labelObj.AddComponent<TextMeshProUGUI>();
+
+        Text textComp = labelObj.AddComponent<Text>();
         textComp.text = text;
         textComp.fontSize = fontSize;
         textComp.alignment = alignment;
         textComp.color = Color.white;
-        // 使用系統默認字體，避免顯示方塊
-        if (TMP_Settings.defaultFontAsset != null)
-        {
-            textComp.font = TMP_Settings.defaultFontAsset;
-        }
-        
+        textComp.fontStyle = FontStyle.Bold;
+        textComp.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
         SetRectTransform(labelObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
-        
+
         return labelObj;
     }
 
     /// <summary>
-    /// 創建輸入框
+    /// 創建輸入框（使用 Unity Text）
     /// </summary>
-    GameObject CreateInputField(Transform parent, string name, 
+    GameObject CreateInputField(Transform parent, string name,
         Vector2 position, Vector2 size, string placeholderText)
     {
         GameObject inputObj = CreateUIElement(name, parent);
-        
+
         Image bgImage = inputObj.AddComponent<Image>();
         bgImage.color = new Color(0.2f, 0.2f, 0.2f, 1f);
-        
-        TMP_InputField inputField = inputObj.AddComponent<TMP_InputField>();
+
+        InputField inputField = inputObj.AddComponent<InputField>();
         SetRectTransform(inputObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
-        
-        // 創建文字區域
-        GameObject textArea = CreateUIElement("TextArea", inputObj.transform);
-        RectTransform textAreaRect = textArea.AddComponent<RectTransform>();
-        SetRectTransform(textArea, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        
+
         // 創建文字組件
-        GameObject textObj = CreateUIElement("Text", textArea.transform);
-        TextMeshProUGUI textComp = textObj.AddComponent<TextMeshProUGUI>();
+        GameObject textObj = CreateUIElement("Text", inputObj.transform);
+        Text textComp = textObj.AddComponent<Text>();
         textComp.text = "";
         textComp.fontSize = 24;
         textComp.color = Color.white;
-        textComp.alignment = TextAlignmentOptions.MidlineLeft;
-        // 使用系統默認字體，避免顯示方塊
-        if (TMP_Settings.defaultFontAsset != null)
-        {
-            textComp.font = TMP_Settings.defaultFontAsset;
-        }
-        
+        textComp.alignment = TextAnchor.MiddleLeft;
+        textComp.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        textComp.supportRichText = false;
+
         RectTransform textRect = textObj.GetComponent<RectTransform>();
         SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         textRect.offsetMin = new Vector2(10, 5);
         textRect.offsetMax = new Vector2(-10, -5);
-        
+
         // 創建佔位符
-        GameObject placeholderObj = CreateUIElement("Placeholder", textArea.transform);
-        TextMeshProUGUI placeholderComp = placeholderObj.AddComponent<TextMeshProUGUI>();
+        GameObject placeholderObj = CreateUIElement("Placeholder", inputObj.transform);
+        Text placeholderComp = placeholderObj.AddComponent<Text>();
         placeholderComp.text = placeholderText;
         placeholderComp.fontSize = 24;
         placeholderComp.color = new Color(0.5f, 0.5f, 0.5f, 1f);
-        placeholderComp.alignment = TextAlignmentOptions.MidlineLeft;
-        // 使用系統默認字體，避免顯示方塊
-        if (TMP_Settings.defaultFontAsset != null)
-        {
-            placeholderComp.font = TMP_Settings.defaultFontAsset;
-        }
-        
+        placeholderComp.alignment = TextAnchor.MiddleLeft;
+        placeholderComp.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        placeholderComp.fontStyle = FontStyle.Italic;
+
         RectTransform placeholderRect = placeholderObj.GetComponent<RectTransform>();
         SetRectTransform(placeholderObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         placeholderRect.offsetMin = new Vector2(10, 5);
         placeholderRect.offsetMax = new Vector2(-10, -5);
-        
+
         // 設置 InputField
-        inputField.textViewport = textAreaRect;
         inputField.textComponent = textComp;
         inputField.placeholder = placeholderComp;
-        
+
         return inputObj;
     }
 
     /// <summary>
-    /// 創建按鈕
+    /// 創建按鈕（使用 Unity Text）
     /// </summary>
-    Button CreateButton(Transform parent, string name, string text, 
+    Button CreateButton(Transform parent, string name, string text,
         Vector2 position, Vector2 size, UnityEngine.Events.UnityAction onClick)
     {
         GameObject buttonObj = CreateUIElement(name, parent);
-        
+
         Image buttonImage = buttonObj.AddComponent<Image>();
         buttonImage.color = new Color(0.2f, 0.5f, 0.8f, 1f);
-        
+
         Button button = buttonObj.AddComponent<Button>();
         button.onClick.AddListener(onClick);
-        
-        // 創建按鈕文字
+
+        // 創建按鈕文字（使用 Unity Text）
         GameObject textObj = CreateUIElement("Text", buttonObj.transform);
-        TextMeshProUGUI textComp = textObj.AddComponent<TextMeshProUGUI>();
+        Text textComp = textObj.AddComponent<Text>();
         textComp.text = text;
         textComp.fontSize = 24;
         textComp.color = Color.white;
-        textComp.alignment = TextAlignmentOptions.Center;
-        // 使用系統默認字體，避免顯示方塊
-        if (TMP_Settings.defaultFontAsset != null)
-        {
-            textComp.font = TMP_Settings.defaultFontAsset;
-        }
-        
+        textComp.alignment = TextAnchor.MiddleCenter;
+        textComp.fontStyle = FontStyle.Bold;
+        textComp.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
         SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         SetRectTransform(buttonObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
-        
+
         return button;
     }
 
@@ -1461,7 +1443,7 @@ public class ROSTCPManager : MonoBehaviour
     /// </summary>
     void ConfigureXRRayInteractors()
     {
-        #if UNITY_XR_INTERACTION_TOOLKIT
+#if UNITY_XR_INTERACTION_TOOLKIT
         try
         {
             // 使用反射來查找 XR Ray Interactor（因為類型名稱可能因版本而異）
@@ -1540,9 +1522,9 @@ public class ROSTCPManager : MonoBehaviour
             Debug.LogWarning($"⚠️ 配置 XR Ray Interactor 時發生錯誤: {ex.Message}");
             Debug.LogWarning($"   這可能是因為 XR Interaction Toolkit 版本不同或未安裝");
         }
-        #else
+#else
         Debug.Log("ℹ️ XR Interaction Toolkit 未安裝或未啟用，跳過自動配置");
-        #endif
+#endif
     }
 
     /// <summary>
@@ -1551,7 +1533,7 @@ public class ROSTCPManager : MonoBehaviour
     void AddVRInteractionSupport(GameObject uiElement)
     {
         // 方法1: 嘗試添加 XR Simple Interactable（如果使用 XR Interaction Toolkit）
-        #if UNITY_XR_INTERACTION_TOOLKIT
+#if UNITY_XR_INTERACTION_TOOLKIT
         try
         {
             var interactable = uiElement.GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable>();
@@ -1564,15 +1546,15 @@ public class ROSTCPManager : MonoBehaviour
         {
             // XR Interaction Toolkit 不可用，使用其他方法
         }
-        #endif
-        
+#endif
+
         // 方法2: 添加 EventTrigger 支持手柄射線點擊
         EventTrigger trigger = uiElement.GetComponent<EventTrigger>();
         if (trigger == null)
         {
             trigger = uiElement.AddComponent<EventTrigger>();
         }
-        
+
         // 對於按鈕，添加點擊事件
         Button btn = uiElement.GetComponent<Button>();
         if (btn != null)
@@ -1580,12 +1562,13 @@ public class ROSTCPManager : MonoBehaviour
             // 添加 Pointer Click 事件
             EventTrigger.Entry clickEntry = new EventTrigger.Entry();
             clickEntry.eventID = EventTriggerType.PointerClick;
-            clickEntry.callback.AddListener((eventData) => {
+            clickEntry.callback.AddListener((eventData) =>
+            {
                 btn.onClick.Invoke();
             });
             trigger.triggers.Add(clickEntry);
         }
-        
+
         // 對於輸入框，添加選擇事件
         TMP_InputField inputField = uiElement.GetComponent<TMP_InputField>();
         if (inputField != null)
@@ -1593,7 +1576,8 @@ public class ROSTCPManager : MonoBehaviour
             // 添加 Pointer Click 事件來選擇輸入框
             EventTrigger.Entry clickEntry = new EventTrigger.Entry();
             clickEntry.eventID = EventTriggerType.PointerClick;
-            clickEntry.callback.AddListener((eventData) => {
+            clickEntry.callback.AddListener((eventData) =>
+            {
                 inputField.Select();
                 inputField.ActivateInputField();
                 ShowVirtualKeyboard(inputField);
@@ -1619,11 +1603,11 @@ public class ROSTCPManager : MonoBehaviour
                     virtualKeyboard = keyboardObj.AddComponent<VirtualKeyboard>();
                 }
                 keyboardObj.transform.localPosition = new Vector3(0, -300, 0);
-                
+
                 // 修復虛擬鍵盤的字体問題
                 FixVirtualKeyboardFonts(keyboardObj);
             }
-            
+
             if (virtualKeyboard != null)
             {
                 virtualKeyboard.Show(targetField);
@@ -1647,27 +1631,27 @@ public class ROSTCPManager : MonoBehaviour
         {
             defaultFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
         }
-        
+
         // 查找所有 TextMeshPro 組件並轉換為 Unity Text
         TextMeshProUGUI[] tmpComponents = keyboardObj.GetComponentsInChildren<TextMeshProUGUI>(true);
         foreach (var tmpComp in tmpComponents)
         {
             if (tmpComp == null) continue;
-            
+
             // 保存文字內容和設置
             string text = tmpComp.text;
             int fontSize = (int)tmpComp.fontSize;
             Color textColor = tmpComp.color;
             TextAlignmentOptions alignment = tmpComp.alignment;
-            
+
             // 獲取父對象
             GameObject parentObj = tmpComp.gameObject;
             Transform parentTransform = parentObj.transform.parent;
-            
+
             // 創建新的 Unity Text 對象
             GameObject textObj = new GameObject("Text");
             textObj.transform.SetParent(parentTransform, false);
-            
+
             // 複製 RectTransform 設置
             RectTransform tmpRect = tmpComp.GetComponent<RectTransform>();
             RectTransform newRect = textObj.AddComponent<RectTransform>();
@@ -1680,13 +1664,13 @@ public class ROSTCPManager : MonoBehaviour
                 newRect.offsetMin = tmpRect.offsetMin;
                 newRect.offsetMax = tmpRect.offsetMax;
             }
-            
+
             // 添加 Unity Text 組件
             Text unityText = textObj.AddComponent<Text>();
             unityText.text = text;
             unityText.fontSize = fontSize;
             unityText.color = textColor;
-            
+
             // 轉換對齊方式
             switch (alignment)
             {
@@ -1706,16 +1690,16 @@ public class ROSTCPManager : MonoBehaviour
                     unityText.alignment = TextAnchor.MiddleCenter;
                     break;
             }
-            
+
             // 設置字体
             if (defaultFont != null)
             {
                 unityText.font = defaultFont;
             }
-            
+
             // 刪除舊的 TextMeshPro 組件
             DestroyImmediate(tmpComp);
-            
+
             Debug.Log($"✅ 已將 {parentObj.name} 的 TextMeshPro 轉換為 Unity Text");
         }
     }
@@ -1726,82 +1710,82 @@ public class ROSTCPManager : MonoBehaviour
     void CreateSimpleVirtualKeyboard(TMP_InputField targetField)
     {
         if (ipConfigCanvasInstance == null) return;
-        
+
         // 創建鍵盤容器
         GameObject keyboardPanel = CreateUIElement("VirtualKeyboard", ipConfigCanvasInstance.transform);
         Image panelImage = keyboardPanel.AddComponent<Image>();
         panelImage.color = new Color(0.15f, 0.15f, 0.15f, 0.95f);
-        SetRectTransform(keyboardPanel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 
+        SetRectTransform(keyboardPanel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
             new Vector2(600, 400), new Vector2(0, -300));
-        
+
         // 創建標題
-        CreateTextLabel(keyboardPanel.transform, "Title", "Virtual Keyboard", 
+        CreateTextLabel(keyboardPanel.transform, "Title", "Virtual Keyboard",
             new Vector2(0, 160), new Vector2(500, 40), 28, TextAlignmentOptions.Center);
-        
+
         // 創建數字按鈕網格 (0-9 和 .)
         float buttonSize = 80f;
         float spacing = 10f;
         float startX = -120f;
         float startY = 80f;
-        
+
         // 第一行: 1, 2, 3
         for (int i = 1; i <= 3; i++)
         {
-            CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(), 
-                new Vector2(startX + (i - 1) * (buttonSize + spacing), startY), 
+            CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(),
+                new Vector2(startX + (i - 1) * (buttonSize + spacing), startY),
                 new Vector2(buttonSize, buttonSize));
         }
-        
+
         // 第二行: 4, 5, 6
         for (int i = 4; i <= 6; i++)
         {
-            CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(), 
-                new Vector2(startX + (i - 4) * (buttonSize + spacing), startY - (buttonSize + spacing)), 
+            CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(),
+                new Vector2(startX + (i - 4) * (buttonSize + spacing), startY - (buttonSize + spacing)),
                 new Vector2(buttonSize, buttonSize));
         }
-        
+
         // 第三行: 7, 8, 9
         for (int i = 7; i <= 9; i++)
         {
-            CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(), 
-                new Vector2(startX + (i - 7) * (buttonSize + spacing), startY - 2 * (buttonSize + spacing)), 
+            CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(),
+                new Vector2(startX + (i - 7) * (buttonSize + spacing), startY - 2 * (buttonSize + spacing)),
                 new Vector2(buttonSize, buttonSize));
         }
-        
+
         // 第四行: 0, .
-        CreateKeyboardButton(keyboardPanel.transform, "Key0", "0", 
-            new Vector2(startX, startY - 3 * (buttonSize + spacing)), 
+        CreateKeyboardButton(keyboardPanel.transform, "Key0", "0",
+            new Vector2(startX, startY - 3 * (buttonSize + spacing)),
             new Vector2(buttonSize, buttonSize));
-        CreateKeyboardButton(keyboardPanel.transform, "KeyDot", ".", 
-            new Vector2(startX + (buttonSize + spacing), startY - 3 * (buttonSize + spacing)), 
+        CreateKeyboardButton(keyboardPanel.transform, "KeyDot", ".",
+            new Vector2(startX + (buttonSize + spacing), startY - 3 * (buttonSize + spacing)),
             new Vector2(buttonSize, buttonSize));
-        
+
         // 功能按鈕
-        CreateKeyboardButton(keyboardPanel.transform, "Backspace", "Del", 
-            new Vector2(startX + 2 * (buttonSize + spacing), startY - 3 * (buttonSize + spacing)), 
+        CreateKeyboardButton(keyboardPanel.transform, "Backspace", "Del",
+            new Vector2(startX + 2 * (buttonSize + spacing), startY - 3 * (buttonSize + spacing)),
             new Vector2(buttonSize, buttonSize));
-        CreateKeyboardButton(keyboardPanel.transform, "Clear", "Clear", 
-            new Vector2(startX + 100, startY - 4 * (buttonSize + spacing)), 
+        CreateKeyboardButton(keyboardPanel.transform, "Clear", "Clear",
+            new Vector2(startX + 100, startY - 4 * (buttonSize + spacing)),
             new Vector2(buttonSize * 1.5f, buttonSize));
-        CreateKeyboardButton(keyboardPanel.transform, "Confirm", "OK", 
-            new Vector2(startX + 100 + (buttonSize * 1.5f + spacing), startY - 4 * (buttonSize + spacing)), 
+        CreateKeyboardButton(keyboardPanel.transform, "Confirm", "OK",
+            new Vector2(startX + 100 + (buttonSize * 1.5f + spacing), startY - 4 * (buttonSize + spacing)),
             new Vector2(buttonSize * 1.5f, buttonSize));
-        
+
         // 添加 VirtualKeyboard 組件
         VirtualKeyboard keyboard = keyboardPanel.AddComponent<VirtualKeyboard>();
         keyboard.SetTargetInputField(targetField);
         virtualKeyboard = keyboard; // 先設置，這樣按鈕可以綁定
-        
+
         // 修復字体
         FixVirtualKeyboardFonts(keyboardPanel);
-        
+
         // 重新綁定所有按鈕（現在 virtualKeyboard 已經設置）
         Button[] buttons = keyboardPanel.GetComponentsInChildren<Button>();
         foreach (var btn in buttons)
         {
             // 移除舊的監聽器
             btn.onClick.RemoveAllListeners();
-            
+
             // 根據按鈕名稱重新綁定
             string btnName = btn.name;
             if (btnName.Contains("Key") && btnName != "KeyDot")
@@ -1828,7 +1812,7 @@ public class ROSTCPManager : MonoBehaviour
             {
                 btn.onClick.AddListener(() => keyboard.Confirm());
             }
-            
+
             // 添加 VR 交互支持
             AddVRInteractionSupport(btn.gameObject);
         }
@@ -1837,16 +1821,16 @@ public class ROSTCPManager : MonoBehaviour
     /// <summary>
     /// 創建鍵盤按鈕（使用 Unity Text 避免字体問題）
     /// </summary>
-    Button CreateKeyboardButton(Transform parent, string name, string text, 
+    Button CreateKeyboardButton(Transform parent, string name, string text,
         Vector2 position, Vector2 size)
     {
         GameObject buttonObj = CreateUIElement(name, parent);
-        
+
         Image buttonImage = buttonObj.AddComponent<Image>();
         buttonImage.color = new Color(0.3f, 0.3f, 0.3f, 1f);
-        
+
         Button button = buttonObj.AddComponent<Button>();
-        
+
         // 創建按鈕文字（使用 Unity Text 而不是 TextMeshPro，避免字体問題）
         GameObject textObj = CreateUIElement("Text", buttonObj.transform);
         Text textComp = textObj.AddComponent<Text>();
@@ -1854,7 +1838,7 @@ public class ROSTCPManager : MonoBehaviour
         textComp.fontSize = 32;
         textComp.color = Color.white;
         textComp.alignment = TextAnchor.MiddleCenter;
-        
+
         // 使用 Unity 默認字体（Arial）
         Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         if (defaultFont == null)
@@ -1865,13 +1849,13 @@ public class ROSTCPManager : MonoBehaviour
         {
             textComp.font = defaultFont;
         }
-        
+
         SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         SetRectTransform(buttonObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
-        
+
         // 注意：按鈕綁定會在 CreateSimpleVirtualKeyboard 中統一處理
         // 這裡只創建按鈕，不綁定事件
-        
+
         return button;
     }
 
@@ -1884,7 +1868,7 @@ public class ROSTCPManager : MonoBehaviour
         {
             ipAddressInputField.text = tempIPAddress;
         }
-        
+
         if (portInputField != null)
         {
             portInputField.text = tempPort.ToString();
@@ -1901,7 +1885,7 @@ public class ROSTCPManager : MonoBehaviour
         {
             tempIPAddress = ipAddressInputField.text;
         }
-        
+
         if (portInputField != null)
         {
             if (int.TryParse(portInputField.text, out int port))
@@ -1909,15 +1893,15 @@ public class ROSTCPManager : MonoBehaviour
                 tempPort = port;
             }
         }
-        
+
         // 驗證 IP 地址格式
         if (IsValidIPAddress(tempIPAddress))
         {
             rosIPAddress = tempIPAddress;
             rosPort = tempPort;
-            
+
             Debug.Log($"✅ IP 配置已更新: {rosIPAddress}:{rosPort}");
-            
+
             // 重新初始化連接
             if (connectionInitialized)
             {
@@ -1925,7 +1909,7 @@ public class ROSTCPManager : MonoBehaviour
                 connectionInitialized = false;
                 InitializeROSConnection();
             }
-            
+
             // 隱藏界面
             OnToggleIPConfigUI();
         }
@@ -1944,7 +1928,7 @@ public class ROSTCPManager : MonoBehaviour
         tempIPAddress = rosIPAddress;
         tempPort = rosPort;
         UpdateIPConfigUI();
-        
+
         // 隱藏界面
         OnToggleIPConfigUI();
     }
@@ -1958,7 +1942,7 @@ public class ROSTCPManager : MonoBehaviour
         {
             isIPConfigUIVisible = !isIPConfigUIVisible;
             ipConfigCanvasInstance.SetActive(isIPConfigUIVisible);
-            
+
             if (toggleButton != null)
             {
                 TextMeshProUGUI toggleText = toggleButton.GetComponentInChildren<TextMeshProUGUI>();
@@ -1977,17 +1961,17 @@ public class ROSTCPManager : MonoBehaviour
     {
         if (string.IsNullOrEmpty(ip))
             return false;
-        
+
         string[] parts = ip.Split('.');
         if (parts.Length != 4)
             return false;
-        
+
         foreach (string part in parts)
         {
             if (!int.TryParse(part, out int num) || num < 0 || num > 255)
                 return false;
         }
-        
+
         return true;
     }
 
@@ -1997,13 +1981,13 @@ public class ROSTCPManager : MonoBehaviour
     {
         isHeartbeatActive = false;
         StopAllCoroutines();
-        
+
         // 清理 IP 配置界面
         if (ipConfigCanvasInstance != null)
         {
             Destroy(ipConfigCanvasInstance);
         }
-        
+
         Debug.Log("🔄 ROSTCPManager 已停止");
     }
 }
