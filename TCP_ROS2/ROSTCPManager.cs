@@ -1268,22 +1268,22 @@ public class ROSTCPManager : MonoBehaviour
         panelImage.color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
         SetRectTransform(panel, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
-        // 創建標題 - 改用 TextAnchor.MiddleCenter
+        // 創建標題
         CreateTextLabel(panel.transform, "Title", "ROS TCP Connection Config",
-            new Vector2(0, 200), new Vector2(800, 60), 36, TextAnchor.MiddleCenter);
+            new Vector2(0, 200), new Vector2(800, 60), 36, TextAlignmentOptions.Center);
 
-        // 創建 IP 地址標籤和輸入框 - 改用 TextAnchor.MiddleLeft
+        // 創建 IP 地址標籤和輸入框
         CreateTextLabel(panel.transform, "IPLabel", "IP Address:",
-            new Vector2(-250, 120), new Vector2(150, 40), 24, TextAnchor.MiddleLeft);
+            new Vector2(-250, 120), new Vector2(150, 40), 24, TextAlignmentOptions.Left);
 
         GameObject ipInputObj = CreateInputField(panel.transform, "IPInput",
             new Vector2(0, 120), new Vector2(400, 50), rosIPAddress);
         ipAddressInputField = ipInputObj.GetComponent<TMP_InputField>();
         ipAddressInputField.onSelect.AddListener((string value) => ShowVirtualKeyboard(ipAddressInputField));
 
-        // 創建端口標籤和輸入框 - 改用 TextAnchor.MiddleLeft
+        // 創建端口標籤和輸入框
         CreateTextLabel(panel.transform, "PortLabel", "Port:",
-            new Vector2(-250, 40), new Vector2(150, 40), 24, TextAnchor.MiddleLeft);
+            new Vector2(-250, 40), new Vector2(150, 40), 24, TextAlignmentOptions.Left);
 
         GameObject portInputObj = CreateInputField(panel.transform, "PortInput",
             new Vector2(0, 40), new Vector2(200, 50), rosPort.ToString());
@@ -1337,20 +1337,23 @@ public class ROSTCPManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 創建文字標籤（使用 Unity Text）
+    /// 創建文字標籤
     /// </summary>
     GameObject CreateTextLabel(Transform parent, string name, string text,
-        Vector2 position, Vector2 size, int fontSize, TextAnchor alignment)
+        Vector2 position, Vector2 size, int fontSize, TextAlignmentOptions alignment)
     {
         GameObject labelObj = CreateUIElement(name, parent);
 
-        Text textComp = labelObj.AddComponent<Text>();
+        TextMeshProUGUI textComp = labelObj.AddComponent<TextMeshProUGUI>();
         textComp.text = text;
         textComp.fontSize = fontSize;
         textComp.alignment = alignment;
         textComp.color = Color.white;
-        textComp.fontStyle = FontStyle.Bold;
-        textComp.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        // 使用系統默認字體，避免顯示方塊
+        if (TMP_Settings.defaultFontAsset != null)
+        {
+            textComp.font = TMP_Settings.defaultFontAsset;
+        }
 
         SetRectTransform(labelObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
 
@@ -1358,7 +1361,7 @@ public class ROSTCPManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 創建輸入框（使用 Unity Text）
+    /// 創建輸入框
     /// </summary>
     GameObject CreateInputField(Transform parent, string name,
         Vector2 position, Vector2 size, string placeholderText)
@@ -1368,18 +1371,26 @@ public class ROSTCPManager : MonoBehaviour
         Image bgImage = inputObj.AddComponent<Image>();
         bgImage.color = new Color(0.2f, 0.2f, 0.2f, 1f);
 
-        InputField inputField = inputObj.AddComponent<InputField>();
+        TMP_InputField inputField = inputObj.AddComponent<TMP_InputField>();
         SetRectTransform(inputObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
 
+        // 創建文字區域
+        GameObject textArea = CreateUIElement("TextArea", inputObj.transform);
+        RectTransform textAreaRect = textArea.AddComponent<RectTransform>();
+        SetRectTransform(textArea, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
         // 創建文字組件
-        GameObject textObj = CreateUIElement("Text", inputObj.transform);
-        Text textComp = textObj.AddComponent<Text>();
+        GameObject textObj = CreateUIElement("Text", textArea.transform);
+        TextMeshProUGUI textComp = textObj.AddComponent<TextMeshProUGUI>();
         textComp.text = "";
         textComp.fontSize = 24;
         textComp.color = Color.white;
-        textComp.alignment = TextAnchor.MiddleLeft;
-        textComp.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        textComp.supportRichText = false;
+        textComp.alignment = TextAlignmentOptions.MidlineLeft;
+        // 使用系統默認字體，避免顯示方塊
+        if (TMP_Settings.defaultFontAsset != null)
+        {
+            textComp.font = TMP_Settings.defaultFontAsset;
+        }
 
         RectTransform textRect = textObj.GetComponent<RectTransform>();
         SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
@@ -1387,14 +1398,17 @@ public class ROSTCPManager : MonoBehaviour
         textRect.offsetMax = new Vector2(-10, -5);
 
         // 創建佔位符
-        GameObject placeholderObj = CreateUIElement("Placeholder", inputObj.transform);
-        Text placeholderComp = placeholderObj.AddComponent<Text>();
+        GameObject placeholderObj = CreateUIElement("Placeholder", textArea.transform);
+        TextMeshProUGUI placeholderComp = placeholderObj.AddComponent<TextMeshProUGUI>();
         placeholderComp.text = placeholderText;
         placeholderComp.fontSize = 24;
         placeholderComp.color = new Color(0.5f, 0.5f, 0.5f, 1f);
-        placeholderComp.alignment = TextAnchor.MiddleLeft;
-        placeholderComp.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        placeholderComp.fontStyle = FontStyle.Italic;
+        placeholderComp.alignment = TextAlignmentOptions.MidlineLeft;
+        // 使用系統默認字體，避免顯示方塊
+        if (TMP_Settings.defaultFontAsset != null)
+        {
+            placeholderComp.font = TMP_Settings.defaultFontAsset;
+        }
 
         RectTransform placeholderRect = placeholderObj.GetComponent<RectTransform>();
         SetRectTransform(placeholderObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
@@ -1402,6 +1416,7 @@ public class ROSTCPManager : MonoBehaviour
         placeholderRect.offsetMax = new Vector2(-10, -5);
 
         // 設置 InputField
+        inputField.textViewport = textAreaRect;
         inputField.textComponent = textComp;
         inputField.placeholder = placeholderComp;
 
@@ -1409,7 +1424,7 @@ public class ROSTCPManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 創建按鈕（使用 Unity Text）
+    /// 創建按鈕
     /// </summary>
     Button CreateButton(Transform parent, string name, string text,
         Vector2 position, Vector2 size, UnityEngine.Events.UnityAction onClick)
@@ -1422,15 +1437,18 @@ public class ROSTCPManager : MonoBehaviour
         Button button = buttonObj.AddComponent<Button>();
         button.onClick.AddListener(onClick);
 
-        // 創建按鈕文字（使用 Unity Text）
+        // 創建按鈕文字
         GameObject textObj = CreateUIElement("Text", buttonObj.transform);
-        Text textComp = textObj.AddComponent<Text>();
+        TextMeshProUGUI textComp = textObj.AddComponent<TextMeshProUGUI>();
         textComp.text = text;
         textComp.fontSize = 24;
         textComp.color = Color.white;
-        textComp.alignment = TextAnchor.MiddleCenter;
-        textComp.fontStyle = FontStyle.Bold;
-        textComp.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        textComp.alignment = TextAlignmentOptions.Center;
+        // 使用系統默認字體，避免顯示方塊
+        if (TMP_Settings.defaultFontAsset != null)
+        {
+            textComp.font = TMP_Settings.defaultFontAsset;
+        }
 
         SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         SetRectTransform(buttonObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
@@ -1718,9 +1736,9 @@ public class ROSTCPManager : MonoBehaviour
         SetRectTransform(keyboardPanel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
             new Vector2(600, 400), new Vector2(0, -300));
 
-        // 創建標題 - 改用 TextAnchor.MiddleCenter
+        // 創建標題
         CreateTextLabel(keyboardPanel.transform, "Title", "Virtual Keyboard",
-            new Vector2(0, 160), new Vector2(500, 40), 28, TextAnchor.MiddleCenter);
+            new Vector2(0, 160), new Vector2(500, 40), 28, TextAlignmentOptions.Center);
 
         // 創建數字按鈕網格 (0-9 和 .)
         float buttonSize = 80f;
@@ -1774,9 +1792,12 @@ public class ROSTCPManager : MonoBehaviour
         // 添加 VirtualKeyboard 組件
         VirtualKeyboard keyboard = keyboardPanel.AddComponent<VirtualKeyboard>();
         keyboard.SetTargetInputField(targetField);
-        virtualKeyboard = keyboard;
+        virtualKeyboard = keyboard; // 先設置，這樣按鈕可以綁定
 
-        // 重新綁定所有按鈕
+        // 修復字体
+        FixVirtualKeyboardFonts(keyboardPanel);
+
+        // 重新綁定所有按鈕（現在 virtualKeyboard 已經設置）
         Button[] buttons = keyboardPanel.GetComponentsInChildren<Button>();
         foreach (var btn in buttons)
         {
