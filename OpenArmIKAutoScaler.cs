@@ -1,16 +1,16 @@
-// OpenArmIKAutoScaler.cs
+// OpenArmIKAutoScaler.cs - 修復版
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class OpenArmIKAutoScaler : MonoBehaviour
 {
     [Header("Targets")]
-    public OpenArmRetargetIK retargetIK;          // 指到場景中的 OpenArmRetargetIK
-    public OpenArmIK leftIKSolver;                // 左臂 OpenArmIK
-    public OpenArmIK rightIKSolver;               // 右臂 OpenArmIK
+    public OpenArmRetargetIK retargetIK;
+    public OpenArmIK leftIKSolver;
+    public OpenArmIK rightIKSolver;
 
     [Header("Optional Input")]
-    public InputActionReference calibrateAction;  // 例如 Grip+Trigger
+    public InputActionReference calibrateAction;
 
     [Header("Calibrate Options")]
     [Tooltip("是否同時校準左右手臂（若其中一側未設定會自動跳過）")]
@@ -55,7 +55,6 @@ public class OpenArmIKAutoScaler : MonoBehaviour
         }
         else
         {
-            // 只校準有填齊的一側（右優先）
             if (!TryCalibrateSide("Right", retargetIK.rightIK, rightIKSolver))
                 TryCalibrateSide("Left", retargetIK.leftIK, leftIKSolver);
         }
@@ -91,9 +90,9 @@ public class OpenArmIKAutoScaler : MonoBehaviour
             return false;
         }
 
-        // 3) 等比縮放係數（各軸同值）
+        // 3) ✅ 修正：設定到 uniformScale（float），而不是 positionScale（Vector3）
         float scale = robotLen / humanLen;
-        arm.positionScale = new Vector3(scale, scale, scale);
+        arm.uniformScale = scale;
 
         Debug.Log($"✅ OpenArmIKAutoScaler[{tag}] 校準完成 | HumanLen={humanLen:F3}m, RobotLen={robotLen:F3}m, Scale={scale:F3}");
         return true;
