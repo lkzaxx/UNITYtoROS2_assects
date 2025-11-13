@@ -1268,22 +1268,22 @@ public class ROSTCPManager : MonoBehaviour
         panelImage.color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
         SetRectTransform(panel, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
-        // 創建標題
+        // 創建標題 - 改用 TextAnchor.MiddleCenter
         CreateTextLabel(panel.transform, "Title", "ROS TCP Connection Config",
-            new Vector2(0, 200), new Vector2(800, 60), 36, TextAlignmentOptions.Center);
+            new Vector2(0, 200), new Vector2(800, 60), 36, TextAnchor.MiddleCenter);
 
-        // 創建 IP 地址標籤和輸入框
+        // 創建 IP 地址標籤和輸入框 - 改用 TextAnchor.MiddleLeft
         CreateTextLabel(panel.transform, "IPLabel", "IP Address:",
-            new Vector2(-250, 120), new Vector2(150, 40), 24, TextAlignmentOptions.Left);
+            new Vector2(-250, 120), new Vector2(150, 40), 24, TextAnchor.MiddleLeft);
 
         GameObject ipInputObj = CreateInputField(panel.transform, "IPInput",
             new Vector2(0, 120), new Vector2(400, 50), rosIPAddress);
         ipAddressInputField = ipInputObj.GetComponent<TMP_InputField>();
         ipAddressInputField.onSelect.AddListener((string value) => ShowVirtualKeyboard(ipAddressInputField));
 
-        // 創建端口標籤和輸入框
+        // 創建端口標籤和輸入框 - 改用 TextAnchor.MiddleLeft
         CreateTextLabel(panel.transform, "PortLabel", "Port:",
-            new Vector2(-250, 40), new Vector2(150, 40), 24, TextAlignmentOptions.Left);
+            new Vector2(-250, 40), new Vector2(150, 40), 24, TextAnchor.MiddleLeft);
 
         GameObject portInputObj = CreateInputField(panel.transform, "PortInput",
             new Vector2(0, 40), new Vector2(200, 50), rosPort.ToString());
@@ -1718,9 +1718,9 @@ public class ROSTCPManager : MonoBehaviour
         SetRectTransform(keyboardPanel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
             new Vector2(600, 400), new Vector2(0, -300));
 
-        // 創建標題
+        // 創建標題 - 改用 TextAnchor.MiddleCenter
         CreateTextLabel(keyboardPanel.transform, "Title", "Virtual Keyboard",
-            new Vector2(0, 160), new Vector2(500, 40), 28, TextAlignmentOptions.Center);
+            new Vector2(0, 160), new Vector2(500, 40), 28, TextAnchor.MiddleCenter);
 
         // 創建數字按鈕網格 (0-9 和 .)
         float buttonSize = 80f;
@@ -1774,12 +1774,9 @@ public class ROSTCPManager : MonoBehaviour
         // 添加 VirtualKeyboard 組件
         VirtualKeyboard keyboard = keyboardPanel.AddComponent<VirtualKeyboard>();
         keyboard.SetTargetInputField(targetField);
-        virtualKeyboard = keyboard; // 先設置，這樣按鈕可以綁定
+        virtualKeyboard = keyboard;
 
-        // 修復字体
-        FixVirtualKeyboardFonts(keyboardPanel);
-
-        // 重新綁定所有按鈕（現在 virtualKeyboard 已經設置）
+        // 重新綁定所有按鈕
         Button[] buttons = keyboardPanel.GetComponentsInChildren<Button>();
         foreach (var btn in buttons)
         {
