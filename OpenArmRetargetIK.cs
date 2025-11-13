@@ -5,7 +5,7 @@ using UnityEngine;
 /// OpenArm Retarget with IK support - 修復版
 /// 修復了座標系轉換和縮放問題
 /// </summary>
-public class OpenArmRetargetIK_Fixed : MonoBehaviour
+public class OpenArmRetargetIK : MonoBehaviour
 {
     public enum ControlMode
     {
@@ -218,8 +218,8 @@ public class OpenArmRetargetIK_Fixed : MonoBehaviour
     public ArmIKConfig rightIK = new ArmIKConfig();
 
     [Header("IK Solver")]
-    public OpenArmIK_Fixed leftIKSolver;
-    public OpenArmIK_Fixed rightIKSolver;
+    public OpenArmIK leftIKSolver;
+    public OpenArmIK rightIKSolver;
 
     [Header("Global")]
     public bool autoCalibrateOnStart = true;
@@ -373,7 +373,7 @@ public class OpenArmRetargetIK_Fixed : MonoBehaviour
     /// <summary>
     /// 初始化 IK 配置
     /// </summary>
-    void InitializeIKConfig(ArmIKConfig config, OpenArmIK_Fixed ikSolver)
+    void InitializeIKConfig(ArmIKConfig config, OpenArmIK ikSolver)
     {
         if (config.wristTarget != null && ikSolver != null)
         {
@@ -385,7 +385,7 @@ public class OpenArmRetargetIK_Fixed : MonoBehaviour
     /// <summary>
     /// 獲取平滑後的 IK 目標位置（修復版 - 正確的座標轉換）
     /// </summary>
-    Vector3 GetSmoothedIKTarget(ArmIKConfig config, OpenArmIK_Fixed ikSolver, float deltaTime)
+    Vector3 GetSmoothedIKTarget(ArmIKConfig config, OpenArmIK ikSolver, float deltaTime)
     {
         if (config.wristTarget == null || ikSolver == null)
             return config.smoothedPosition;
@@ -517,7 +517,7 @@ public class OpenArmRetargetIK_Fixed : MonoBehaviour
         }
     }
 
-    void DrawIKDebug(ArmIKConfig config, OpenArmIK_Fixed ikSolver, Color color)
+    void DrawIKDebug(ArmIKConfig config, OpenArmIK ikSolver, Color color)
     {
         // 繪製人體手腕位置
         Gizmos.color = color;
