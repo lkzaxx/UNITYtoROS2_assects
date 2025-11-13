@@ -2,8 +2,10 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// OpenArm Retarget with IK support - 修復版 v2
-/// 修正了座標系轉換問題
+/// OpenArm Retarget with IK support - 完全修復版 v3
+/// ✅ 修正座標系轉換問題
+/// ✅ 修正編輯器模式下的初始化
+/// ✅ 加強調試輸出
 /// </summary>
 public class OpenArmRetargetIK : MonoBehaviour
 {
@@ -181,11 +183,16 @@ public class OpenArmRetargetIK : MonoBehaviour
         public Transform wristTarget;
         public Transform elbowHint;
 
+        [Header("⚠️ 重要：機械臂基座參考點")]
+        [Tooltip("機械臂的實際基座Transform（通常是最外層的父物件，如 'OpenArm_Base' 或 'Robot'）")]
+        public Transform robotBaseOverride;
+
         [Header("末端執行器偏移（局部座標）")]
+        [Tooltip("從手腕關節到實際抓取點的偏移")]
         public Vector3 endEffectorOffset = Vector3.zero;
 
-        [Header("縮放設定")]
-        [Tooltip("統一縮放因子（人體臂長 vs 機械臂長度）")]
+        [Header("✅ 縮放設定 - 請先執行校準！")]
+        [Tooltip("統一縮放因子（由 OpenArmIKAutoScaler 自動設定）")]
         public float uniformScale = 1.0f;
 
         [Header("IK 平滑")]
@@ -198,13 +205,21 @@ public class OpenArmRetargetIK : MonoBehaviour
 
         [Header("IK 約束（機械臂局部座標系）")]
         public bool usePositionConstraint = true;
+        [Tooltip("相對於機械臂基座的最小位置（局部座標）")]
         public Vector3 constraintMin = new Vector3(-0.5f, -0.3f, 0.1f);
+        [Tooltip("相對於機械臂基座的最大位置（局部座標）")]
         public Vector3 constraintMax = new Vector3(0.5f, 0.5f, 0.8f);
 
         // 內部平滑狀態
         [HideInInspector] public Vector3 smoothedPosition;
         [HideInInspector] public Quaternion smoothedRotation = Quaternion.identity;
         [HideInInspector] public bool isInitialized = false;
+
+        // ✅ 診斷資訊
+        [HideInInspector] public Vector3 lastHumanArmVectorWorld;
+        [HideInInspector] public Vector3 lastHumanArmVectorLocal;
+        [HideInInspector] public Vector3 lastScaledArmVectorLocal;
+        [HideInInspector] public Vector3 lastConstrainedLocal;
     }
 
     [Header("Control Mode")]
@@ -226,16 +241,38 @@ public class OpenArmRetargetIK : MonoBehaviour
     public bool autoCalibrateOnStart = true;
     public KeyCode switchModeKey = KeyCode.Tab;
 
+    [Header("⚠️ 校準提醒")]
+    [Tooltip("如果為true，會在Play模式開始時檢查是否已校準")]
+    public bool warnIfNotCalibrated = true;
+
     [Header("Debug")]
     public bool showDebugInfo = false;
     public bool drawDebugGizmos = true;
+    [Tooltip("顯示詳細的座標轉換過程")]
+    public bool showDetailedDebug = false;
+
+    // ✅ 新增：追蹤是否已校準
+    private bool _hasBeenCalibrated = false;
 
     void Start()
     {
+        // ✅ 先確保IK求解器已初始化連桿偏移
+        if (leftIKSolver != null)
+        {
+            leftIKSolver.SendMessage("InitializeLinkOffsets", SendMessageOptions.DontRequireReceiver);
+        }
+        if (rightIKSolver != null)
+        {
+            rightIKSolver.SendMessage("InitializeLinkOffsets", SendMessageOptions.DontRequireReceiver);
+        }
+
         if (autoCalibrateOnStart)
         {
             CalibrateAll();
         }
+
+        // ✅ 檢查是否需要校準縮放
+        CheckCalibrationStatus();
 
         InitializeIKConfig(leftIK, leftIKSolver);
         InitializeIKConfig(rightIK, rightIKSolver);
@@ -270,6 +307,56 @@ public class OpenArmRetargetIK : MonoBehaviour
                 break;
         }
     }
+
+    #region 校準檢查
+
+    void CheckCalibrationStatus()
+    {
+        if (!warnIfNotCalibrated) return;
+
+        bool needsCalibration = false;
+        string warnings = "⚠️ OpenArmRetargetIK 校準檢查:\n";
+
+        // 檢查左手
+        if (leftIK.wristTarget != null && leftIKSolver != null)
+        {
+            if (Mathf.Approximately(leftIK.uniformScale, 1.0f))
+            {
+                warnings += "❌ 左手 uniformScale = 1.0 (可能未校準)\n";
+                needsCalibration = true;
+            }
+            if (leftIK.robotBaseOverride == null)
+            {
+                warnings += "⚠️ 左手 robotBaseOverride 未設定（將自動使用 joints[0].parent）\n";
+            }
+        }
+
+        // 檢查右手
+        if (rightIK.wristTarget != null && rightIKSolver != null)
+        {
+            if (Mathf.Approximately(rightIK.uniformScale, 1.0f))
+            {
+                warnings += "❌ 右手 uniformScale = 1.0 (可能未校準)\n";
+                needsCalibration = true;
+            }
+            if (rightIK.robotBaseOverride == null)
+            {
+                warnings += "⚠️ 右手 robotBaseOverride 未設定（將自動使用 joints[0].parent）\n";
+            }
+        }
+
+        if (needsCalibration)
+        {
+            warnings += "\n💡 建議：請在場景中添加 OpenArmIKAutoScaler 並執行 'Calibrate Now'";
+            Debug.LogWarning(warnings);
+        }
+        else
+        {
+            Debug.Log("✅ OpenArmRetargetIK: 校準狀態正常");
+        }
+    }
+
+    #endregion
 
     #region 控制模式實作
 
@@ -364,69 +451,94 @@ public class OpenArmRetargetIK : MonoBehaviour
 
     #endregion
 
-    #region IK 輔助方法（✅ 修復版）
+    #region IK 輔助方法（✅ 完全修復版）
 
     void InitializeIKConfig(ArmIKConfig config, OpenArmIK ikSolver)
     {
         if (config.wristTarget != null && ikSolver != null)
         {
-            config.smoothedPosition = GetSmoothedIKTarget(config, ikSolver, 0f);
-            config.isInitialized = true;
+            // ✅ 確保在Play模式下才初始化位置
+            if (Application.isPlaying)
+            {
+                config.smoothedPosition = GetSmoothedIKTarget(config, ikSolver, 0f);
+                config.isInitialized = true;
+            }
         }
     }
 
     /// <summary>
-    /// 獲取平滑後的 IK 目標位置（✅ 完全修復版）
+    /// ✅ 獲取機械臂基座Transform（優先使用override，否則自動查找）
+    /// </summary>
+    Transform GetRobotBase(ArmIKConfig config, OpenArmIK ikSolver)
+    {
+        // 1. 優先使用手動設定的基座
+        if (config.robotBaseOverride != null)
+            return config.robotBaseOverride;
+
+        // 2. 自動查找：使用第一個關節的父物件
+        if (ikSolver.joints != null && ikSolver.joints.Length > 0 && ikSolver.joints[0].joint != null)
+        {
+            Transform parent = ikSolver.joints[0].joint.transform.parent;
+            if (parent != null)
+                return parent;
+
+            // 如果沒有父物件，使用關節本身
+            return ikSolver.joints[0].joint.transform;
+        }
+
+        Debug.LogWarning("⚠️ 無法找到機械臂基座！請設定 robotBaseOverride");
+        return null;
+    }
+
+    /// <summary>
+    /// ✅ 獲取平滑後的 IK 目標位置（完全修復版 v3）
     /// </summary>
     Vector3 GetSmoothedIKTarget(ArmIKConfig config, OpenArmIK ikSolver, float deltaTime)
     {
         if (config.wristTarget == null || ikSolver == null)
             return config.smoothedPosition;
 
-        // 1. 獲取機械臂基座 Transform
-        Transform robotBase = null;
-        if (ikSolver.joints != null && ikSolver.joints.Length > 0 && ikSolver.joints[0].joint != null)
-        {
-            robotBase = ikSolver.joints[0].joint.transform.parent;
-            if (robotBase == null)
-                robotBase = ikSolver.joints[0].joint.transform;
-        }
-
+        // 1. 獲取機械臂基座
+        Transform robotBase = GetRobotBase(config, ikSolver);
         if (robotBase == null)
-        {
-            Debug.LogWarning("⚠️ 無法找到機械臂基座");
             return config.smoothedPosition;
-        }
 
-        // 2. 計算人體手臂向量（世界座標）
-        Vector3 humanShoulderPos = config.shoulderReference != null
+        // 2. 獲取人體肩膀和手腕位置（世界座標）
+        Vector3 humanShoulderWorld = config.shoulderReference != null
             ? config.shoulderReference.position
-            : config.wristTarget.position;
-        Vector3 humanWristPos = config.wristTarget.position;
-        Vector3 humanArmVectorWorld = humanWristPos - humanShoulderPos;
+            : robotBase.position; // 如果沒有肩膀參考，使用機械臂基座
 
-        // ✅ 修正：將人體手臂向量轉換到機械臂的局部座標系
+        Vector3 humanWristWorld = config.wristTarget.position;
+
+        // 3. 計算人體手臂向量（世界座標）
+        Vector3 humanArmVectorWorld = humanWristWorld - humanShoulderWorld;
+        config.lastHumanArmVectorWorld = humanArmVectorWorld;
+
+        // 4. ✅ 關鍵修正：將人體手臂向量轉換到機械臂基座的局部座標系
         Vector3 humanArmVectorLocal = robotBase.InverseTransformDirection(humanArmVectorWorld);
+        config.lastHumanArmVectorLocal = humanArmVectorLocal;
 
-        // 3. 套用統一縮放（在局部座標系中）
+        // 5. 套用統一縮放（在局部座標系中）
         Vector3 scaledArmVectorLocal = humanArmVectorLocal * config.uniformScale;
+        config.lastScaledArmVectorLocal = scaledArmVectorLocal;
 
-        // 4. 套用末端執行器偏移（在局部座標系中）
+        // 6. 套用末端執行器偏移（在局部座標系中）
         Vector3 localTarget = scaledArmVectorLocal + config.endEffectorOffset;
 
-        // 5. 約束檢查（在局部座標系中）
+        // 7. 約束檢查（在局部座標系中）
         if (config.usePositionConstraint)
         {
             localTarget.x = Mathf.Clamp(localTarget.x, config.constraintMin.x, config.constraintMax.x);
             localTarget.y = Mathf.Clamp(localTarget.y, config.constraintMin.y, config.constraintMax.y);
             localTarget.z = Mathf.Clamp(localTarget.z, config.constraintMin.z, config.constraintMax.z);
         }
+        config.lastConstrainedLocal = localTarget;
 
-        // 6. 轉回世界座標
+        // 8. ✅ 轉回世界座標（相對於機械臂基座）
         Vector3 finalTargetWorldPos = robotBase.TransformPoint(localTarget);
 
-        // 7. 平滑處理
-        if (!config.isInitialized || deltaTime <= 0f)
+        // 9. 平滑處理
+        if (!config.isInitialized || deltaTime <= 0f || !Application.isPlaying)
         {
             config.smoothedPosition = finalTargetWorldPos;
             config.isInitialized = true;
@@ -441,16 +553,19 @@ public class OpenArmRetargetIK : MonoBehaviour
             );
         }
 
-        // 🔍 調試輸出
-        if (showDebugInfo && Time.frameCount % 60 == 0)
+        // 🔍 詳細調試輸出
+        if (showDetailedDebug && (Time.frameCount % 60 == 0 || !Application.isPlaying))
         {
-            Debug.Log($"=== IK 目標計算 ===");
-            Debug.Log($"人體臂向量(世界): {humanArmVectorWorld}");
-            Debug.Log($"人體臂向量(局部): {humanArmVectorLocal}");
-            Debug.Log($"縮放後(局部): {scaledArmVectorLocal}");
-            Debug.Log($"約束後(局部): {localTarget}");
-            Debug.Log($"最終目標(世界): {finalTargetWorldPos}");
-            Debug.Log($"機械臂基座: {robotBase.position}");
+            Debug.Log($"=== IK 目標計算詳細資訊 ===\n" +
+                     $"機械臂基座: {robotBase.name} @ {robotBase.position}\n" +
+                     $"人體肩膀(世界): {humanShoulderWorld}\n" +
+                     $"人體手腕(世界): {humanWristWorld}\n" +
+                     $"人體臂向量(世界): {humanArmVectorWorld} (長度: {humanArmVectorWorld.magnitude:F3}m)\n" +
+                     $"人體臂向量(局部): {humanArmVectorLocal}\n" +
+                     $"uniformScale: {config.uniformScale:F3}\n" +
+                     $"縮放後(局部): {scaledArmVectorLocal} (長度: {scaledArmVectorLocal.magnitude:F3}m)\n" +
+                     $"約束後(局部): {localTarget}\n" +
+                     $"最終目標(世界): {finalTargetWorldPos}");
         }
 
         return config.smoothedPosition;
@@ -482,7 +597,8 @@ public class OpenArmRetargetIK : MonoBehaviour
             foreach (var j in rightJoints)
                 j?.CalibrateNeutral();
 
-        Debug.Log("✅ OpenArmRetargetIK: 校準完成");
+        _hasBeenCalibrated = true;
+        Debug.Log("✅ OpenArmRetargetIK: 關節校準完成");
     }
 
     [ContextMenu("切換控制模式")]
@@ -498,6 +614,48 @@ public class OpenArmRetargetIK : MonoBehaviour
         Debug.Log($"🔄 設定模式: {controlMode}");
     }
 
+    [ContextMenu("診斷 IK 設定")]
+    public void DiagnoseIKSettings()
+    {
+        Debug.Log("=== OpenArmRetargetIK 診斷報告 ===");
+
+        // 左手診斷
+        if (leftIK.wristTarget != null && leftIKSolver != null)
+        {
+            Transform robotBase = GetRobotBase(leftIK, leftIKSolver);
+            Vector3 testTarget = GetSmoothedIKTarget(leftIK, leftIKSolver, 0f);
+            float currentError = leftIKSolver.GetEndEffectorPosition() != null
+                ? Vector3.Distance(leftIKSolver.GetEndEffectorPosition(), testTarget)
+                : 0f;
+
+            Debug.Log($"【左手】\n" +
+                     $"  機械臂基座: {(robotBase != null ? robotBase.name : "未找到")}\n" +
+                     $"  uniformScale: {leftIK.uniformScale:F3}\n" +
+                     $"  人體臂長: {leftIK.lastHumanArmVectorWorld.magnitude:F3}m\n" +
+                     $"  縮放後臂長: {leftIK.lastScaledArmVectorLocal.magnitude:F3}m\n" +
+                     $"  當前誤差: {currentError * 1000f:F1}mm\n" +
+                     $"  約束範圍: {leftIK.constraintMin} ~ {leftIK.constraintMax}");
+        }
+
+        // 右手診斷
+        if (rightIK.wristTarget != null && rightIKSolver != null)
+        {
+            Transform robotBase = GetRobotBase(rightIK, rightIKSolver);
+            Vector3 testTarget = GetSmoothedIKTarget(rightIK, rightIKSolver, 0f);
+            float currentError = rightIKSolver.GetEndEffectorPosition() != null
+                ? Vector3.Distance(rightIKSolver.GetEndEffectorPosition(), testTarget)
+                : 0f;
+
+            Debug.Log($"【右手】\n" +
+                     $"  機械臂基座: {(robotBase != null ? robotBase.name : "未找到")}\n" +
+                     $"  uniformScale: {rightIK.uniformScale:F3}\n" +
+                     $"  人體臂長: {rightIK.lastHumanArmVectorWorld.magnitude:F3}m\n" +
+                     $"  縮放後臂長: {rightIK.lastScaledArmVectorLocal.magnitude:F3}m\n" +
+                     $"  當前誤差: {currentError * 1000f:F1}mm\n" +
+                     $"  約束範圍: {rightIK.constraintMin} ~ {rightIK.constraintMax}");
+        }
+    }
+
     #endregion
 
     #region 調試視覺化
@@ -508,46 +666,79 @@ public class OpenArmRetargetIK : MonoBehaviour
 
         if (leftIK.wristTarget != null && leftIKSolver != null)
         {
-            DrawIKDebug(leftIK, leftIKSolver, Color.blue);
+            DrawIKDebug(leftIK, leftIKSolver, Color.blue, "L");
         }
 
         if (rightIK.wristTarget != null && rightIKSolver != null)
         {
-            DrawIKDebug(rightIK, rightIKSolver, Color.red);
+            DrawIKDebug(rightIK, rightIKSolver, Color.red, "R");
         }
     }
 
-    void DrawIKDebug(ArmIKConfig config, OpenArmIK ikSolver, Color color)
+    void DrawIKDebug(ArmIKConfig config, OpenArmIK ikSolver, Color color, string label)
     {
+        // 繪製人體手腕目標（原始）
         Gizmos.color = color;
         Gizmos.DrawWireSphere(config.wristTarget.position, 0.03f);
 
+        // 繪製平滑後的IK目標
+        Vector3 smoothedTarget = GetSmoothedIKTarget(config, ikSolver, 0f);
         Gizmos.color = Color.Lerp(color, Color.white, 0.5f);
-        Gizmos.DrawWireSphere(config.smoothedPosition, 0.025f);
+        Gizmos.DrawWireSphere(smoothedTarget, 0.025f);
 
+        // 繪製從原始到平滑的連線
         Gizmos.color = Color.yellow;
-        Gizmos.DrawLine(config.wristTarget.position, config.smoothedPosition);
+        Gizmos.DrawLine(config.wristTarget.position, smoothedTarget);
 
+        // 繪製機械臂末端執行器
         Vector3 endPos = ikSolver.GetEndEffectorPosition();
         Gizmos.color = Color.green;
         Gizmos.DrawWireSphere(endPos, 0.02f);
 
+        // 繪製從IK目標到末端執行器的誤差
         Gizmos.color = Color.magenta;
-        Gizmos.DrawLine(config.smoothedPosition, endPos);
+        Gizmos.DrawLine(smoothedTarget, endPos);
+
+        // 繪製機械臂基座
+        Transform robotBase = GetRobotBase(config, ikSolver);
+        if (robotBase != null)
+        {
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawWireCube(robotBase.position, Vector3.one * 0.05f);
+
+            // 繪製基座座標軸
+            Gizmos.color = Color.red;
+            Gizmos.DrawRay(robotBase.position, robotBase.right * 0.1f);
+            Gizmos.color = Color.green;
+            Gizmos.DrawRay(robotBase.position, robotBase.up * 0.1f);
+            Gizmos.color = Color.blue;
+            Gizmos.DrawRay(robotBase.position, robotBase.forward * 0.1f);
+        }
 
 #if UNITY_EDITOR
-        float distance = Vector3.Distance(config.smoothedPosition, endPos);
+        float distance = Vector3.Distance(smoothedTarget, endPos);
         UnityEditor.Handles.Label(
-            (config.smoothedPosition + endPos) * 0.5f,
-            $"IK誤差: {distance * 1000f:F1}mm"
+            (smoothedTarget + endPos) * 0.5f,
+            $"[{label}] IK誤差: {distance * 1000f:F1}mm\nScale:{config.uniformScale:F2}"
         );
+        
+        // 顯示基座名稱
+        if (robotBase != null)
+        {
+            UnityEditor.Handles.Label(
+                robotBase.position + Vector3.up * 0.1f,
+                $"基座: {robotBase.name}"
+            );
+        }
 #endif
     }
 
     void OnGUI()
     {
-        GUILayout.BeginArea(new Rect(10, 10, 300, 200));
-        GUILayout.Label("OpenArm Retarget IK (修復版 v2)", GUI.skin.box);
+        if (!showDebugInfo) return;
+
+        GUILayout.BeginArea(new Rect(10, 10, 400, 300));
+        GUILayout.Label("OpenArm Retarget IK (修復版 v3)", GUI.skin.box);
 
         GUILayout.Label($"控制模式: {controlMode}");
         GUILayout.Label($"切換鍵: {switchModeKey}");
@@ -557,29 +748,42 @@ public class OpenArmRetargetIK : MonoBehaviour
             SwitchMode();
         }
 
-        if (GUILayout.Button("校準"))
+        if (GUILayout.Button("校準關節"))
         {
             CalibrateAll();
         }
+
+        if (GUILayout.Button("診斷 IK 設定"))
+        {
+            DiagnoseIKSettings();
+        }
+
+        GUILayout.Space(10);
 
         if (controlMode == ControlMode.IK || controlMode == ControlMode.Hybrid)
         {
             if (leftIKSolver != null && leftIK.wristTarget != null)
             {
-                float error = Vector3.Distance(
-                    leftIKSolver.GetEndEffectorPosition(),
-                    leftIK.smoothedPosition
-                ) * 1000f;
-                GUILayout.Label($"左手誤差: {error:F1}mm");
+                Vector3 target = GetSmoothedIKTarget(leftIK, leftIKSolver, 0f);
+                float error = Vector3.Distance(leftIKSolver.GetEndEffectorPosition(), target) * 1000f;
+
+                GUILayout.Label($"【左手】");
+                GUILayout.Label($"  誤差: {error:F1}mm");
+                GUILayout.Label($"  Scale: {leftIK.uniformScale:F3}");
+                GUILayout.Label($"  臂長: {leftIK.lastHumanArmVectorWorld.magnitude:F3}m");
             }
+
+            GUILayout.Space(5);
 
             if (rightIKSolver != null && rightIK.wristTarget != null)
             {
-                float error = Vector3.Distance(
-                    rightIKSolver.GetEndEffectorPosition(),
-                    rightIK.smoothedPosition
-                ) * 1000f;
-                GUILayout.Label($"右手誤差: {error:F1}mm");
+                Vector3 target = GetSmoothedIKTarget(rightIK, rightIKSolver, 0f);
+                float error = Vector3.Distance(rightIKSolver.GetEndEffectorPosition(), target) * 1000f;
+
+                GUILayout.Label($"【右手】");
+                GUILayout.Label($"  誤差: {error:F1}mm");
+                GUILayout.Label($"  Scale: {rightIK.uniformScale:F3}");
+                GUILayout.Label($"  臂長: {rightIK.lastHumanArmVectorWorld.magnitude:F3}m");
             }
         }
 
