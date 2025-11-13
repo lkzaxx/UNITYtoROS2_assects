@@ -75,6 +75,8 @@ public class ROSTCPManager : MonoBehaviour
     public GameObject ipConfigCanvasPrefab;
     [Tooltip("虛擬鍵盤 Prefab（可選）")]
     public GameObject virtualKeyboardPrefab;
+    [Tooltip("TextMeshPro 字體資源（必須指定！）")]
+    public TMP_FontAsset tmpFont;  // 🔥 新增：讓用戶手動指定字體
     [Tooltip("界面位置（相對於主攝像機）")]
     public Vector3 uiPosition = new Vector3(0, 1.6f, 2f);
     [Tooltip("界面縮放")]
@@ -1386,10 +1388,19 @@ void LoadTMPFont(TextMeshProUGUI textComponent)
 {
     if (textComponent == null) return;
 
+    // 🔥 最優先：使用手動指定的字體
+    if (tmpFont != null)
+    {
+        textComponent.font = tmpFont;
+        Debug.Log($"✅ 使用手動指定的 TMP 字體: {tmpFont.name}");
+        return;
+    }
+
     // 優先使用默認字體
     if (TMP_Settings.defaultFontAsset != null)
     {
         textComponent.font = TMP_Settings.defaultFontAsset;
+        Debug.Log($"✅ 使用 TMP 默認字體: {TMP_Settings.defaultFontAsset.name}");
         return;
     }
 
@@ -1399,7 +1410,8 @@ void LoadTMPFont(TextMeshProUGUI textComponent)
         "Fonts & Materials/LiberationSans SDF",
         "TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF",
         "TextMesh Pro/Fonts/LiberationSans SDF",
-        "TMP/Fonts/LiberationSans SDF"
+        "TMP/Fonts/LiberationSans SDF",
+        "TextMesh Pro/Resources/Fonts & Materials/LiberationSans - OFL SDF"  // 新路徑
     };
 
     foreach (string path in fontPaths)
@@ -1424,7 +1436,8 @@ void LoadTMPFont(TextMeshProUGUI textComponent)
 
     Debug.LogError("❌ 找不到任何 TextMeshPro 字體！請執行以下步驟：\n" +
                    "1. Window > TextMeshPro > Import TMP Essential Resources\n" +
-                   "2. 或手動添加 TMP 字體到 Resources 資料夾");
+                   "2. 在 Inspector 中手動指定 tmpFont 字體資源\n" +
+                   "3. 或手動添加 TMP 字體到 Resources 資料夾");
 }
 
 
