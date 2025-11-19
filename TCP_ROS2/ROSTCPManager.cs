@@ -1728,160 +1728,161 @@ void FixVirtualKeyboardFonts(GameObject keyboardObj)
     }
 }
 
-    /// <summary>
-    /// 創建簡單的虛擬鍵盤（如果沒有 Prefab）
-    /// </summary>
-    void CreateSimpleVirtualKeyboard(TMP_InputField targetField)
+/// <summary>
+/// 創建簡單的虛擬鍵盤（完全使用 Unity Text）
+/// </summary>
+void CreateSimpleVirtualKeyboard(TMP_InputField targetField)
+{
+    if (ipConfigCanvasInstance == null) return;
+
+    // 創建鍵盤容器
+    GameObject keyboardPanel = CreateUIElement("VirtualKeyboard", ipConfigCanvasInstance.transform);
+    Image panelImage = keyboardPanel.AddComponent<Image>();
+    panelImage.color = new Color(0.15f, 0.15f, 0.15f, 0.95f);
+    SetRectTransform(keyboardPanel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+        new Vector2(600, 400), new Vector2(0, -300));
+
+    // 創建標題 - 改用 Unity Text 而非 TextMeshPro
+    GameObject titleObj = CreateUIElement("Title", keyboardPanel.transform);
+    Text titleText = titleObj.AddComponent<Text>();
+    titleText.text = "Virtual Keyboard";
+    titleText.fontSize = 28;
+    titleText.color = Color.white;
+    titleText.alignment = TextAnchor.MiddleCenter;
+    titleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+    SetRectTransform(titleObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 
+        new Vector2(500, 40), new Vector2(0, 160));
+
+    // 創建數字按鈕網格 (0-9 和 .)
+    float buttonSize = 80f;
+    float spacing = 10f;
+    float startX = -120f;
+    float startY = 80f;
+
+    // 第一行: 1, 2, 3
+    for (int i = 1; i <= 3; i++)
     {
-        if (ipConfigCanvasInstance == null) return;
-
-        // 創建鍵盤容器
-        GameObject keyboardPanel = CreateUIElement("VirtualKeyboard", ipConfigCanvasInstance.transform);
-        Image panelImage = keyboardPanel.AddComponent<Image>();
-        panelImage.color = new Color(0.15f, 0.15f, 0.15f, 0.95f);
-        SetRectTransform(keyboardPanel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-            new Vector2(600, 400), new Vector2(0, -300));
-
-        // 創建標題
-        CreateTextLabel(keyboardPanel.transform, "Title", "Virtual Keyboard",
-            new Vector2(0, 160), new Vector2(500, 40), 28, TextAlignmentOptions.Center);
-
-        // 創建數字按鈕網格 (0-9 和 .)
-        float buttonSize = 80f;
-        float spacing = 10f;
-        float startX = -120f;
-        float startY = 80f;
-
-        // 第一行: 1, 2, 3
-        for (int i = 1; i <= 3; i++)
-        {
-            CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(),
-                new Vector2(startX + (i - 1) * (buttonSize + spacing), startY),
-                new Vector2(buttonSize, buttonSize));
-        }
-
-        // 第二行: 4, 5, 6
-        for (int i = 4; i <= 6; i++)
-        {
-            CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(),
-                new Vector2(startX + (i - 4) * (buttonSize + spacing), startY - (buttonSize + spacing)),
-                new Vector2(buttonSize, buttonSize));
-        }
-
-        // 第三行: 7, 8, 9
-        for (int i = 7; i <= 9; i++)
-        {
-            CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(),
-                new Vector2(startX + (i - 7) * (buttonSize + spacing), startY - 2 * (buttonSize + spacing)),
-                new Vector2(buttonSize, buttonSize));
-        }
-
-        // 第四行: 0, .
-        CreateKeyboardButton(keyboardPanel.transform, "Key0", "0",
-            new Vector2(startX, startY - 3 * (buttonSize + spacing)),
+        CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(),
+            new Vector2(startX + (i - 1) * (buttonSize + spacing), startY),
             new Vector2(buttonSize, buttonSize));
-        CreateKeyboardButton(keyboardPanel.transform, "KeyDot", ".",
-            new Vector2(startX + (buttonSize + spacing), startY - 3 * (buttonSize + spacing)),
-            new Vector2(buttonSize, buttonSize));
-
-        // 功能按鈕
-        CreateKeyboardButton(keyboardPanel.transform, "Backspace", "Del",
-            new Vector2(startX + 2 * (buttonSize + spacing), startY - 3 * (buttonSize + spacing)),
-            new Vector2(buttonSize, buttonSize));
-        CreateKeyboardButton(keyboardPanel.transform, "Clear", "Clear",
-            new Vector2(startX + 100, startY - 4 * (buttonSize + spacing)),
-            new Vector2(buttonSize * 1.5f, buttonSize));
-        CreateKeyboardButton(keyboardPanel.transform, "Confirm", "OK",
-            new Vector2(startX + 100 + (buttonSize * 1.5f + spacing), startY - 4 * (buttonSize + spacing)),
-            new Vector2(buttonSize * 1.5f, buttonSize));
-
-        // 添加 VirtualKeyboard 組件
-        VirtualKeyboard keyboard = keyboardPanel.AddComponent<VirtualKeyboard>();
-        keyboard.SetTargetInputField(targetField);
-        virtualKeyboard = keyboard; // 先設置，這樣按鈕可以綁定
-
-        // 修復字体
-        FixVirtualKeyboardFonts(keyboardPanel);
-
-        // 重新綁定所有按鈕（現在 virtualKeyboard 已經設置）
-        Button[] buttons = keyboardPanel.GetComponentsInChildren<Button>();
-        foreach (var btn in buttons)
-        {
-            // 移除舊的監聽器
-            btn.onClick.RemoveAllListeners();
-
-            // 根據按鈕名稱重新綁定
-            string btnName = btn.name;
-            if (btnName.Contains("Key") && btnName != "KeyDot")
-            {
-                string numStr = btnName.Replace("Key", "");
-                if (int.TryParse(numStr, out int num))
-                {
-                    btn.onClick.AddListener(() => keyboard.AddCharacter(num.ToString()));
-                }
-            }
-            else if (btnName == "KeyDot")
-            {
-                btn.onClick.AddListener(() => keyboard.AddCharacter("."));
-            }
-            else if (btnName == "Backspace")
-            {
-                btn.onClick.AddListener(() => keyboard.Backspace());
-            }
-            else if (btnName == "Clear")
-            {
-                btn.onClick.AddListener(() => keyboard.Clear());
-            }
-            else if (btnName == "Confirm")
-            {
-                btn.onClick.AddListener(() => keyboard.Confirm());
-            }
-
-            // 添加 VR 交互支持
-            AddVRInteractionSupport(btn.gameObject);
-        }
     }
 
-    /// <summary>
-    /// 創建鍵盤按鈕（使用 Unity Text 避免字体問題）
-    /// </summary>
-    Button CreateKeyboardButton(Transform parent, string name, string text,
-        Vector2 position, Vector2 size)
+    // 第二行: 4, 5, 6
+    for (int i = 4; i <= 6; i++)
     {
-        GameObject buttonObj = CreateUIElement(name, parent);
-
-        Image buttonImage = buttonObj.AddComponent<Image>();
-        buttonImage.color = new Color(0.3f, 0.3f, 0.3f, 1f);
-
-        Button button = buttonObj.AddComponent<Button>();
-
-        // 創建按鈕文字（使用 Unity Text 而不是 TextMeshPro，避免字体問題）
-        GameObject textObj = CreateUIElement("Text", buttonObj.transform);
-        Text textComp = textObj.AddComponent<Text>();
-        textComp.text = text;
-        textComp.fontSize = 32;
-        textComp.color = Color.white;
-        textComp.alignment = TextAnchor.MiddleCenter;
-
-        // 使用 Unity 默認字体（Arial）
-        Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        if (defaultFont == null)
-        {
-            defaultFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        }
-        if (defaultFont != null)
-        {
-            textComp.font = defaultFont;
-        }
-
-        SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-        SetRectTransform(buttonObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
-
-        // 注意：按鈕綁定會在 CreateSimpleVirtualKeyboard 中統一處理
-        // 這裡只創建按鈕，不綁定事件
-
-        return button;
+        CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(),
+            new Vector2(startX + (i - 4) * (buttonSize + spacing), startY - (buttonSize + spacing)),
+            new Vector2(buttonSize, buttonSize));
     }
+
+    // 第三行: 7, 8, 9
+    for (int i = 7; i <= 9; i++)
+    {
+        CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(),
+            new Vector2(startX + (i - 7) * (buttonSize + spacing), startY - 2 * (buttonSize + spacing)),
+            new Vector2(buttonSize, buttonSize));
+    }
+
+    // 第四行: 0, .
+    CreateKeyboardButton(keyboardPanel.transform, "Key0", "0",
+        new Vector2(startX, startY - 3 * (buttonSize + spacing)),
+        new Vector2(buttonSize, buttonSize));
+    CreateKeyboardButton(keyboardPanel.transform, "KeyDot", ".",
+        new Vector2(startX + (buttonSize + spacing), startY - 3 * (buttonSize + spacing)),
+        new Vector2(buttonSize, buttonSize));
+
+    // 功能按鈕
+    CreateKeyboardButton(keyboardPanel.transform, "Backspace", "Del",
+        new Vector2(startX + 2 * (buttonSize + spacing), startY - 3 * (buttonSize + spacing)),
+        new Vector2(buttonSize, buttonSize));
+    CreateKeyboardButton(keyboardPanel.transform, "Clear", "Clear",
+        new Vector2(startX + 100, startY - 4 * (buttonSize + spacing)),
+        new Vector2(buttonSize * 1.5f, buttonSize));
+    CreateKeyboardButton(keyboardPanel.transform, "Confirm", "OK",
+        new Vector2(startX + 100 + (buttonSize * 1.5f + spacing), startY - 4 * (buttonSize + spacing)),
+        new Vector2(buttonSize * 1.5f, buttonSize));
+
+    // 添加 VirtualKeyboard 組件
+    VirtualKeyboard keyboard = keyboardPanel.AddComponent<VirtualKeyboard>();
+    keyboard.SetTargetInputField(targetField);
+    virtualKeyboard = keyboard;
+
+    // 不需要呼叫 FixVirtualKeyboardFonts，因為我們沒有使用 TextMeshPro
+
+    // 重新綁定所有按鈕
+    Button[] buttons = keyboardPanel.GetComponentsInChildren<Button>();
+    foreach (var btn in buttons)
+    {
+        btn.onClick.RemoveAllListeners();
+
+        string btnName = btn.name;
+        if (btnName.Contains("Key") && btnName != "KeyDot")
+        {
+            string numStr = btnName.Replace("Key", "");
+            if (int.TryParse(numStr, out int num))
+            {
+                btn.onClick.AddListener(() => keyboard.AddCharacter(num.ToString()));
+            }
+        }
+        else if (btnName == "KeyDot")
+        {
+            btn.onClick.AddListener(() => keyboard.AddCharacter("."));
+        }
+        else if (btnName == "Backspace")
+        {
+            btn.onClick.AddListener(() => keyboard.Backspace());
+        }
+        else if (btnName == "Clear")
+        {
+            btn.onClick.AddListener(() => keyboard.Clear());
+        }
+        else if (btnName == "Confirm")
+        {
+            btn.onClick.AddListener(() => keyboard.Confirm());
+        }
+
+        // 添加 VR 交互支持
+        AddVRInteractionSupport(btn.gameObject);
+    }
+}
+
+/// <summary>
+/// 創建鍵盤按鈕（保持使用 Unity Text）
+/// </summary>
+Button CreateKeyboardButton(Transform parent, string name, string text,
+    Vector2 position, Vector2 size)
+{
+    GameObject buttonObj = CreateUIElement(name, parent);
+
+    Image buttonImage = buttonObj.AddComponent<Image>();
+    buttonImage.color = new Color(0.3f, 0.3f, 0.3f, 1f);
+
+    Button button = buttonObj.AddComponent<Button>();
+
+    // 創建按鈕文字（使用 Unity Text）
+    GameObject textObj = CreateUIElement("Text", buttonObj.transform);
+    Text textComp = textObj.AddComponent<Text>();
+    textComp.text = text;
+    textComp.fontSize = 32;
+    textComp.color = Color.white;
+    textComp.alignment = TextAnchor.MiddleCenter;
+
+    // 使用 Unity 默認字體
+    Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+    if (defaultFont == null)
+    {
+        defaultFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
+    }
+    if (defaultFont != null)
+    {
+        textComp.font = defaultFont;
+    }
+
+    SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+    SetRectTransform(buttonObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
+
+    return button;
+}
 
     /// <summary>
     /// 更新 IP 配置界面顯示
