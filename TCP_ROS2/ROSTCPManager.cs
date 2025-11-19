@@ -176,39 +176,71 @@ public class ROSTCPManager : MonoBehaviour
         {
             Debug.Log($"🔧 開始初始化 ROS 連接，目標: {rosIPAddress}:{rosPort}");
 
-            // ✅ 關鍵修正：先設定 ROS Settings
-            var settings = ROSSettings.GetOrCreateInstance();
-            if (settings != null)
-            {
-                settings.RosIPAddress = rosIPAddress;
-                settings.RosPort = (ushort)rosPort;
-                settings.ConnectOnStartup = true;
-                Debug.Log($"✅ ROS Settings 已設定: {settings.RosIPAddress}:{settings.RosPort}");
-            }
-
-            // 獲取 ROS TCP Connector 實例
+            // ✅ 關鍵修正：獲取 ROS TCP Connector 實例
             ros = ROSConnection.GetOrCreateInstance();
 
-            if (ros != null)
+            if (ros == null)
             {
-                Debug.Log($"✅ ROS Connection 實例已建立");
+                Debug.LogError("❌ 無法建立 ROS Connection 實例！");
+                Debug.LogError("   請確認已安裝 ROS-TCP-Connector 套件");
+                Debug.LogError("   並在 Edit → Project Settings → Robotics → ROS Settings 設定連接參數");
+                return;
+            }
 
-                // ✅ 關鍵修正：明確呼叫連接
-                if (!ros.HasConnectionThread)
+            Debug.Log($"✅ ROS Connection 實例已建立");
+
+            // ✅ 關鍵修正：使用反射設定連接參數
+            try
+            {
+                var rosConnectionType = ros.GetType();
+
+                // 嘗試設定 ROS IP
+                var ipField = rosConnectionType.GetField("m_RosIPAddress",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (ipField != null)
                 {
-                    Debug.LogWarning("⚠️ ROS 連接線程未啟動，正在手動啟動...");
+                    ipField.SetValue(ros, rosIPAddress);
+                    Debug.Log($"✅ 已透過反射設定 ROS IP: {rosIPAddress}");
+                }
+
+                // 嘗試設定 ROS Port
+                var portField = rosConnectionType.GetField("m_RosPort",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (portField != null)
+                {
+                    portField.SetValue(ros, rosPort);
+                    Debug.Log($"✅ 已透過反射設定 ROS Port: {rosPort}");
+                }
+            }
+            catch (System.Exception reflectionEx)
+            {
+                Debug.LogWarning($"⚠️ 無法透過反射設定連接參數: {reflectionEx.Message}");
+                Debug.LogWarning($"   請在 Unity → Edit → Project Settings → Robotics → ROS Settings 中設定:");
+                Debug.LogWarning($"   - ROS IP Address: {rosIPAddress}");
+                Debug.LogWarning($"   - ROS Port: {rosPort}");
+            }
+
+            // ✅ 關鍵修正：明確呼叫連接
+            if (!ros.HasConnectionThread)
+            {
+                Debug.LogWarning("⚠️ ROS 連接線程未啟動，正在手動啟動...");
+
+                try
+                {
                     ros.Connect();
                     Debug.Log("✅ 已呼叫 Connect() 方法");
+
+                    // 等待一下讓連接建立
+                    StartCoroutine(WaitAndCheckConnection());
                 }
-                else
+                catch (System.Exception connectEx)
                 {
-                    Debug.Log("✅ ROS 連接線程已在運行");
+                    Debug.LogError($"❌ 呼叫 Connect() 失敗: {connectEx.Message}");
                 }
             }
             else
             {
-                Debug.LogError("❌ 無法建立 ROS Connection 實例！");
-                return;
+                Debug.Log("✅ ROS 連接線程已在運行");
             }
 
             // 註冊訂閱者
@@ -245,6 +277,34 @@ public class ROSTCPManager : MonoBehaviour
 
             // 延遲重試
             Invoke(nameof(InitializeROSConnection), 5.0f);
+        }
+    }
+
+    /// <summary>
+    /// 等待並檢查連接狀態
+    /// </summary>
+    IEnumerator WaitAndCheckConnection()
+    {
+        yield return new WaitForSeconds(1.0f);
+
+        if (ros != null)
+        {
+            if (ros.HasConnectionThread)
+            {
+                Debug.Log("🎉 ROS 連接線程已成功啟動！");
+                isConnected = true;
+            }
+            else
+            {
+                Debug.LogError("❌ ROS 連接線程啟動失敗！");
+                Debug.LogError("   請檢查:");
+                Debug.LogError($"   1. ROS2 端是否運行: ros2 run ros_tcp_endpoint default_server_endpoint");
+                Debug.LogError($"   2. IP 地址是否正確: {rosIPAddress}");
+                Debug.LogError($"   3. 端口是否正確: {rosPort}");
+                Debug.LogError("   4. 防火牆是否阻擋連接");
+                Debug.LogError("   5. 在 Edit → Project Settings → Robotics → ROS Settings 中手動設定連接參數");
+                isConnected = false;
+            }
         }
     }
 
