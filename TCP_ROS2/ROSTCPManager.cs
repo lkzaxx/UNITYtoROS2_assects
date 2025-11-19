@@ -174,21 +174,41 @@ public class ROSTCPManager : MonoBehaviour
     {
         try
         {
+            Debug.Log($"🔧 開始初始化 ROS 連接，目標: {rosIPAddress}:{rosPort}");
+
+            // ✅ 關鍵修正：先設定 ROS Settings
+            var settings = ROSSettings.GetOrCreateInstance();
+            if (settings != null)
+            {
+                settings.RosIPAddress = rosIPAddress;
+                settings.RosPort = (ushort)rosPort;
+                settings.ConnectOnStartup = true;
+                Debug.Log($"✅ ROS Settings 已設定: {settings.RosIPAddress}:{settings.RosPort}");
+            }
+
             // 獲取 ROS TCP Connector 實例
             ros = ROSConnection.GetOrCreateInstance();
 
-            // 重要：確保連接參數正確設定
             if (ros != null)
             {
-                // 透過反射或其他方式設定 IP 和 Port（如果 API 允許）
-                // 注意：通常這些設定在 ROS Settings 中配置
-                Debug.Log($"📡 使用 ROS 連接設定: {rosIPAddress}:{rosPort}");
+                Debug.Log($"✅ ROS Connection 實例已建立");
 
-                // 確保連接開始
+                // ✅ 關鍵修正：明確呼叫連接
                 if (!ros.HasConnectionThread)
                 {
-                    Debug.LogWarning("⚠️ ROS 連接線程未啟動，嘗試手動啟動...");
+                    Debug.LogWarning("⚠️ ROS 連接線程未啟動，正在手動啟動...");
+                    ros.Connect();
+                    Debug.Log("✅ 已呼叫 Connect() 方法");
                 }
+                else
+                {
+                    Debug.Log("✅ ROS 連接線程已在運行");
+                }
+            }
+            else
+            {
+                Debug.LogError("❌ 無法建立 ROS Connection 實例！");
+                return;
             }
 
             // 註冊訂閱者
@@ -208,7 +228,7 @@ public class ROSTCPManager : MonoBehaviour
 
             connectionInitialized = true;
             isConnected = true;
-            Debug.Log("✅ ROSTCPManager 初始化完成");
+            Debug.Log("🎉 ROSTCPManager 初始化完成");
 
             // 啟用自動發送關節狀態
             if (autoSendJointStates && retarget != null)
@@ -220,6 +240,8 @@ public class ROSTCPManager : MonoBehaviour
         {
             Debug.LogError($"❌ ROSTCPManager 初始化失敗: {ex.Message}");
             Debug.LogError($"Stack trace: {ex.StackTrace}");
+
+            isConnected = false;
 
             // 延遲重試
             Invoke(nameof(InitializeROSConnection), 5.0f);
