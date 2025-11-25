@@ -757,7 +757,7 @@ public class ROSTCPManager : MonoBehaviour
     [ContextMenu("測試發送關節命令")]
     public void TestSendJointCommand()
     {
-        string[] testJoints = { "joint1", "joint2", "joint3", "joint4", "joint5", "joint6" };
+        string[] testJoints = { "L_J1", "L_J2", "L_J3", "L_J4", "L_J5", "L_J6" };
         float[] testPositions = { 0.1f, -0.1f, 0.2f, -0.2f, 0.1f, -0.1f };
         PublishJointCommands(testJoints, testPositions);
     }
