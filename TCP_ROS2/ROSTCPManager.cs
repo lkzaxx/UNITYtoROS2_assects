@@ -109,24 +109,43 @@ public class ROSTCPManager : MonoBehaviour
     private string tempIPAddress;
     private int tempPort;
 
-    // OpenArm 關節上下限（弧度）- 根據實際硬體規格
-    private readonly float[] jointMinLimits = new float[7] {
-        -3.49f,   // J1
-        -3.32f,   // J2
-        -1.57f,   // J3
-        0f,       // J4
-        -1.57f,   // J5
-        -0.79f,   // J6
-        -1.57f    // J7
+    // OpenArm 關節上下限（弧度）- 區分左右手 (ROS2 openarm_bimanual_control.urdf)
+    private readonly float[] leftJointMinLimits = new float[7] {
+        -3.490659f,   // J1
+        -3.316125f,   // J2
+        -1.570796f,   // J3
+        0f,           // J4
+        -1.570796f,   // J5
+        -0.785398f,   // J6
+        -1.570796f    // J7
     };
-    private readonly float[] jointMaxLimits = new float[7] {
-        3.48f,    // J1
-        3.28f,    // J2
-        1.50f,    // J3
-        2.4f,     // J4
-        1.50f,    // J5
-        0.71f,    // J6
-        1.50f     // J7
+    private readonly float[] leftJointMaxLimits = new float[7] {
+        1.396263f,    // J1
+        0.174533f,    // J2
+        1.570796f,    // J3
+        2.443461f,    // J4
+        1.570796f,    // J5
+        0.785398f,    // J6
+        1.570796f     // J7
+    };
+
+    private readonly float[] rightJointMinLimits = new float[7] {
+        -1.396263f,   // J1
+        -0.174533f,   // J2
+        -1.570796f,   // J3
+        0f,           // J4
+        -1.570796f,   // J5
+        -0.785398f,   // J6
+        -1.570796f    // J7
+    };
+    private readonly float[] rightJointMaxLimits = new float[7] {
+        3.490659f,    // J1
+        3.316125f,    // J2
+        1.570796f,    // J3
+        2.443461f,    // J4
+        1.570796f,    // J5
+        0.785398f,    // J6
+        1.570796f     // J7
     };
 
     // 單例模式
@@ -992,17 +1011,17 @@ public class ROSTCPManager : MonoBehaviour
                     float angleDeg = drive.target;
                     float angleRad = angleDeg * Mathf.Deg2Rad;
 
-                    // 檢查是否超出範圍
+                    // 檢查是否超出範圍 (使用左手限制)
                     bool outOfRange = false;
                     string rangeStatus = "";
-                    if (i < jointMinLimits.Length)
+                    if (i < leftJointMinLimits.Length)
                     {
-                        if (angleRad < jointMinLimits[i])
+                        if (angleRad < leftJointMinLimits[i] - 1e-3f)
                         {
                             outOfRange = true;
                             rangeStatus = " [低於下限]";
                         }
-                        else if (angleRad > jointMaxLimits[i])
+                        else if (angleRad > leftJointMaxLimits[i] + 1e-3f)
                         {
                             outOfRange = true;
                             rangeStatus = " [高於上限]";
@@ -1040,17 +1059,17 @@ public class ROSTCPManager : MonoBehaviour
                     float angleDeg = drive.target;
                     float angleRad = angleDeg * Mathf.Deg2Rad;
 
-                    // 檢查是否超出範圍
+                    // 檢查是否超出範圍 (使用右手限制)
                     bool outOfRange = false;
                     string rangeStatus = "";
-                    if (i < jointMinLimits.Length)
+                    if (i < rightJointMinLimits.Length)
                     {
-                        if (angleRad < jointMinLimits[i])
+                        if (angleRad < rightJointMinLimits[i] - 1e-3f)
                         {
                             outOfRange = true;
                             rangeStatus = " [低於下限]";
                         }
-                        else if (angleRad > jointMaxLimits[i])
+                        else if (angleRad > rightJointMaxLimits[i] + 1e-3f)
                         {
                             outOfRange = true;
                             rangeStatus = " [高於上限]";
@@ -1100,8 +1119,8 @@ public class ROSTCPManager : MonoBehaviour
         {
             if (Time.time - lastJointStateSendTime >= jointStateSendInterval)
             {
-                SendRetargetJointsToROS2("left", retarget.left, leftJointNames);
-                SendRetargetJointsToROS2("right", retarget.right, rightJointNames);
+                SendRetargetJointsToROS2("left", retarget.left, leftJointNames, true);
+                SendRetargetJointsToROS2("right", retarget.right, rightJointNames, false);
                 lastJointStateSendTime = Time.time;
             }
         }
@@ -1120,7 +1139,7 @@ public class ROSTCPManager : MonoBehaviour
     /// <summary>
     /// 從 OpenArmRetarget 讀取關節角度並發送到 ROS2
     /// </summary>
-    void SendRetargetJointsToROS2(string side, OpenArmRetarget.JointMap[] joints, string[] jointNames)
+    void SendRetargetJointsToROS2(string side, OpenArmRetarget.JointMap[] joints, string[] jointNames, bool isLeft)
     {
         if (joints == null || joints.Length == 0) return;
         if (jointNames == null || jointNames.Length != joints.Length)
@@ -1142,7 +1161,7 @@ public class ROSTCPManager : MonoBehaviour
                 float angleRad = angleDeg * Mathf.Deg2Rad;  // 度 → 弧度
 
                 // 套用上下限檢查
-                angleRad = ClampJointAngle(angleRad, i);
+                angleRad = ClampJointAngle(angleRad, i, isLeft);
                 anglesRad[i] = angleRad;
                 hasValidJoints = true;
             }
@@ -1166,20 +1185,26 @@ public class ROSTCPManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 限制關節角度在安全範圍內
+    /// 限制關節角度在安全範圍內 (區分左右手)
     /// </summary>
-    float ClampJointAngle(float angleRad, int jointIndex)
+    float ClampJointAngle(float angleRad, int jointIndex, bool isLeft)
     {
-        if (jointIndex < 0 || jointIndex >= jointMinLimits.Length)
+        float[] minLimits = isLeft ? leftJointMinLimits : rightJointMinLimits;
+        float[] maxLimits = isLeft ? leftJointMaxLimits : rightJointMaxLimits;
+
+        if (jointIndex < 0 || jointIndex >= minLimits.Length)
             return angleRad;
 
-        float clamped = Mathf.Clamp(angleRad, jointMinLimits[jointIndex], jointMaxLimits[jointIndex]);
+        float min = minLimits[jointIndex];
+        float max = maxLimits[jointIndex];
 
-        // 如果超出範圍，記錄警告
+        float clamped = Mathf.Clamp(angleRad, min, max);
+
+        // 如果超出範圍，記錄警告 (僅當差異顯著時)
         if (Mathf.Abs(clamped - angleRad) > 0.01f)
         {
-            Debug.LogWarning($"⚠️ Joint {jointIndex + 1} 角度超出範圍: {angleRad:F3} rad → 限制為 {clamped:F3} rad " +
-                           $"(範圍: {jointMinLimits[jointIndex]:F2} ~ {jointMaxLimits[jointIndex]:F2})");
+            Debug.LogWarning($"⚠️ {(isLeft ? "Left" : "Right")} Joint {jointIndex + 1} 角度超出範圍: {angleRad:F3} rad → 限制為 {clamped:F3} rad " +
+                           $"(範圍: {min:F2} ~ {max:F2})");
         }
 
         return clamped;
@@ -1203,8 +1228,8 @@ public class ROSTCPManager : MonoBehaviour
             return;
         }
 
-        SendRetargetJointsToROS2("left", retarget.left, leftJointNames);
-        SendRetargetJointsToROS2("right", retarget.right, rightJointNames);
+        SendRetargetJointsToROS2("left", retarget.left, leftJointNames, true);
+        SendRetargetJointsToROS2("right", retarget.right, rightJointNames, false);
 
         Debug.Log("📤 已發送當前關節狀態到 ROS2");
     }
@@ -1216,10 +1241,17 @@ public class ROSTCPManager : MonoBehaviour
     public void ShowJointLimits()
     {
         Debug.Log("=== OpenArm 關節上下限（弧度）===");
-        for (int i = 0; i < jointMinLimits.Length; i++)
+        Debug.Log("--- 左手 (Left) ---");
+        for (int i = 0; i < leftJointMinLimits.Length; i++)
         {
-            Debug.Log($"J{i + 1}: {jointMinLimits[i]:F2} ~ {jointMaxLimits[i]:F2} rad " +
-                     $"({jointMinLimits[i] * Mathf.Rad2Deg:F1}° ~ {jointMaxLimits[i] * Mathf.Rad2Deg:F1}°)");
+            Debug.Log($"L_J{i + 1}: {leftJointMinLimits[i]:F3} ~ {leftJointMaxLimits[i]:F3} rad " +
+                     $"({leftJointMinLimits[i] * Mathf.Rad2Deg:F1}° ~ {leftJointMaxLimits[i] * Mathf.Rad2Deg:F1}°)");
+        }
+        Debug.Log("--- 右手 (Right) ---");
+        for (int i = 0; i < rightJointMinLimits.Length; i++)
+        {
+            Debug.Log($"R_J{i + 1}: {rightJointMinLimits[i]:F3} ~ {rightJointMaxLimits[i]:F3} rad " +
+                     $"({rightJointMinLimits[i] * Mathf.Rad2Deg:F1}° ~ {rightJointMaxLimits[i] * Mathf.Rad2Deg:F1}°)");
         }
     }
 
