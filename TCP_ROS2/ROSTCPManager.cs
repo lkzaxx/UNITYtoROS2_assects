@@ -155,10 +155,12 @@ public class ROSTCPManager : MonoBehaviour
     };
 
     [Header("VR 手把側鍵控制")]
-    [Tooltip("開啟後，只有按住指定的 Input Action（按鍵/手把按鈕）時才會自動發送關節 / 夾爪訊息到 ROS2")]
+    [Tooltip("開啟後，只有按住對應手的側鍵時，才會發送該側手臂 / 夾爪訊息到 ROS2")]
     public bool requireSideButtonToSend = true;
-    [Tooltip("選擇一個 Input Action 作為「按住才發送資料」的側鍵（例如 XR Grip、Trigger 或鍵盤按鍵）")]
-    public InputActionReference sideButtonAction;
+    [Tooltip("左手側鍵 Input Action（例如 Left Grip / Trigger / 任意按鍵）")]
+    public InputActionReference leftSideButtonAction;
+    [Tooltip("右手側鍵 Input Action（例如 Right Grip / Trigger / 任意按鍵）")]
+    public InputActionReference rightSideButtonAction;
 
     // 單例模式
     private static ROSTCPManager instance;
@@ -182,19 +184,27 @@ public class ROSTCPManager : MonoBehaviour
 
     void OnEnable()
     {
-        // 啟用側鍵 Input Action（可在 Inspector 選擇）
-        if (sideButtonAction != null && sideButtonAction.action != null)
+        // 啟用左右側鍵 Input Action（可在 Inspector 選擇）
+        if (leftSideButtonAction != null && leftSideButtonAction.action != null)
         {
-            sideButtonAction.action.Enable();
+            leftSideButtonAction.action.Enable();
+        }
+        if (rightSideButtonAction != null && rightSideButtonAction.action != null)
+        {
+            rightSideButtonAction.action.Enable();
         }
     }
 
     void OnDisable()
     {
-        // 停用側鍵 Input Action
-        if (sideButtonAction != null && sideButtonAction.action != null)
+        // 停用左右側鍵 Input Action
+        if (leftSideButtonAction != null && leftSideButtonAction.action != null)
         {
-            sideButtonAction.action.Disable();
+            leftSideButtonAction.action.Disable();
+        }
+        if (rightSideButtonAction != null && rightSideButtonAction.action != null)
+        {
+            rightSideButtonAction.action.Disable();
         }
     }
 
@@ -1144,64 +1154,102 @@ public class ROSTCPManager : MonoBehaviour
 
     void FixedUpdate()
     {
+        bool canSendLeft = !requireSideButtonToSend || IsLeftSideButtonPressed();
+        bool canSendRight = !requireSideButtonToSend || IsRightSideButtonPressed();
+
         // 自動發送關節狀態
         if (autoSendJointStates && retarget != null && isConnected && ros != null)
         {
-            // 若需要按側鍵，先檢查手把狀態
-            if (!requireSideButtonToSend || IsControllerSideButtonPressed())
+            // 左右手分別根據各自側鍵決定是否發送
+            if (Time.time - lastJointStateSendTime >= jointStateSendInterval)
             {
-                if (Time.time - lastJointStateSendTime >= jointStateSendInterval)
-                {
+                if (canSendLeft)
                     SendRetargetJointsToROS2("left", retarget.left, leftJointNames, true);
+                if (canSendRight)
                     SendRetargetJointsToROS2("right", retarget.right, rightJointNames, false);
+
+                if (canSendLeft || canSendRight)
                     lastJointStateSendTime = Time.time;
-                }
             }
         }
 
         // 自動發送夾爪 L_EE / R_EE
         if (autoSendGripperEE && (leftGripper != null || rightGripper != null) && isConnected && ros != null)
         {
-            // 若需要按側鍵，先檢查手把狀態
-            if (!requireSideButtonToSend || IsControllerSideButtonPressed())
+            // 夾爪：只要任一側鍵按住即可發送
+            bool canSendGripper = !requireSideButtonToSend || canSendLeft || canSendRight;
+            if (canSendGripper && Time.time - lastGripperSendTime >= gripperSendInterval)
             {
-                if (Time.time - lastGripperSendTime >= gripperSendInterval)
-                {
-                    PublishGripperEEJointState();
-                    lastGripperSendTime = Time.time;
-                }
+                PublishGripperEEJointState();
+                lastGripperSendTime = Time.time;
             }
         }
     }
 
     /// <summary>
-    /// 檢查是否有側鍵被按下（優先使用 Input Action，可在 Inspector 選擇；若未設定則退回 XR Grip 偵測）
+    /// 檢查左手側鍵是否被按下（優先使用 Input Action，可在 Inspector 選擇；若未設定則退回 XR Left Grip 偵測）
     /// </summary>
-    bool IsControllerSideButtonPressed()
+    bool IsLeftSideButtonPressed()
     {
-        // 1) 優先使用可在 Inspector 指定的 Input Action（與 OpenArmSimpleCalibrator 類似）
-        if (sideButtonAction != null && sideButtonAction.action != null)
+        // 1) 優先使用可在 Inspector 指定的 Input Action
+        if (leftSideButtonAction != null && leftSideButtonAction.action != null)
         {
             try
             {
-                // IsPressed() 適用於按鍵 / 手把按鈕類型的 Action
-                if (sideButtonAction.action.IsPressed())
-                {
+                if (leftSideButtonAction.action.IsPressed())
                     return true;
-                }
             }
             catch (System.Exception ex)
             {
-                Debug.LogWarning($"⚠️ 讀取 sideButtonAction 狀態失敗，改用 XR Grip 偵測: {ex.Message}");
+                Debug.LogWarning($"⚠️ 讀取 leftSideButtonAction 狀態失敗，改用 XR Left Grip 偵測: {ex.Message}");
             }
         }
 
-        // 2) 若沒有設定 Input Action，或上述失敗，則使用 XR Grip Button 作為備援（維持舊行為）
+        // 2) 若沒有設定 Input Action，或上述失敗，則使用 XR Left Grip Button 作為備援
         xrControllers.Clear();
 
-        // 取得所有「手持控制器」類型的 XR 裝置
+        // 取得所有左手「手持控制器」類型的 XR 裝置
         InputDevices.GetDevicesWithCharacteristics(
-            InputDeviceCharacteristics.HeldInHand | InputDeviceCharacteristics.Controller,
+            InputDeviceCharacteristics.HeldInHand | InputDeviceCharacteristics.Controller | InputDeviceCharacteristics.Left,
+            xrControllers
+        );
+
+        foreach (UnityEngine.XR.InputDevice device in xrControllers)
+        {
+            if (device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.gripButton, out bool pressed) && pressed)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 檢查右手側鍵是否被按下（優先使用 Input Action，可在 Inspector 選擇；若未設定則退回 XR Right Grip 偵測）
+    /// </summary>
+    bool IsRightSideButtonPressed()
+    {
+        // 1) 優先使用可在 Inspector 指定的 Input Action
+        if (rightSideButtonAction != null && rightSideButtonAction.action != null)
+        {
+            try
+            {
+                if (rightSideButtonAction.action.IsPressed())
+                    return true;
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"⚠️ 讀取 rightSideButtonAction 狀態失敗，改用 XR Right Grip 偵測: {ex.Message}");
+            }
+        }
+
+        // 2) 若沒有設定 Input Action，或上述失敗，則使用 XR Right Grip Button 作為備援
+        xrControllers.Clear();
+
+        // 取得所有右手「手持控制器」類型的 XR 裝置
+        InputDevices.GetDevicesWithCharacteristics(
+            InputDeviceCharacteristics.HeldInHand | InputDeviceCharacteristics.Controller | InputDeviceCharacteristics.Right,
             xrControllers
         );
 
