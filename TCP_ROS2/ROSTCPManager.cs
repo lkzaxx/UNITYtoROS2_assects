@@ -7,9 +7,11 @@ using RosMessageTypes.Sensor;
 using RosMessageTypes.BuiltinInterfaces;
 using Unity.Robotics.ROSTCPConnector.MessageGeneration;
 using System.Collections;
+using System.Collections.Generic;      // 用於 XR Input 裝置列表
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.EventSystems;
+using UnityEngine.XR;                 // 用於讀取手把側鍵狀態
 
 /// <summary>
 /// 統一的 ROS TCP 連接管理器 - 修正版
@@ -97,6 +99,9 @@ public class ROSTCPManager : MonoBehaviour
     private float lastJointStateSendTime = 0f;
     private float lastGripperSendTime = 0f;
 
+    // XR 手把裝置快取（用來檢查側鍵狀態）
+    private static readonly List<InputDevice> xrControllers = new List<InputDevice>();
+
     // IP 配置界面相關
     private GameObject ipConfigCanvasInstance;
     private TMP_InputField ipAddressInputField;
@@ -147,6 +152,10 @@ public class ROSTCPManager : MonoBehaviour
         0.785398f,    // J6
         1.570796f     // J7
     };
+
+    [Header("VR 手把側鍵控制")]
+    [Tooltip("開啟後，只有按住 VR 手把側鍵時才會自動發送關節 / 夾爪訊息到 ROS2")]
+    public bool requireSideButtonToSend = true;
 
     // 單例模式
     private static ROSTCPManager instance;
@@ -1117,23 +1126,55 @@ public class ROSTCPManager : MonoBehaviour
         // 自動發送關節狀態
         if (autoSendJointStates && retarget != null && isConnected && ros != null)
         {
-            if (Time.time - lastJointStateSendTime >= jointStateSendInterval)
+            // 若需要按側鍵，先檢查手把狀態
+            if (!requireSideButtonToSend || IsControllerSideButtonPressed())
             {
-                SendRetargetJointsToROS2("left", retarget.left, leftJointNames, true);
-                SendRetargetJointsToROS2("right", retarget.right, rightJointNames, false);
-                lastJointStateSendTime = Time.time;
+                if (Time.time - lastJointStateSendTime >= jointStateSendInterval)
+                {
+                    SendRetargetJointsToROS2("left", retarget.left, leftJointNames, true);
+                    SendRetargetJointsToROS2("right", retarget.right, rightJointNames, false);
+                    lastJointStateSendTime = Time.time;
+                }
             }
         }
 
         // 自動發送夾爪 L_EE / R_EE
         if (autoSendGripperEE && (leftGripper != null || rightGripper != null) && isConnected && ros != null)
         {
-            if (Time.time - lastGripperSendTime >= gripperSendInterval)
+            // 若需要按側鍵，先檢查手把狀態
+            if (!requireSideButtonToSend || IsControllerSideButtonPressed())
             {
-                PublishGripperEEJointState();
-                lastGripperSendTime = Time.time;
+                if (Time.time - lastGripperSendTime >= gripperSendInterval)
+                {
+                    PublishGripperEEJointState();
+                    lastGripperSendTime = Time.time;
+                }
             }
         }
+    }
+
+    /// <summary>
+    /// 檢查是否有任一 VR 手把側鍵（gripButton）被按下
+    /// </summary>
+    bool IsControllerSideButtonPressed()
+    {
+        xrControllers.Clear();
+
+        // 取得所有「手持控制器」類型的 XR 裝置
+        InputDevices.GetDevicesWithCharacteristics(
+            InputDeviceCharacteristics.HeldInHand | InputDeviceCharacteristics.Controller,
+            xrControllers
+        );
+
+        foreach (var device in xrControllers)
+        {
+            if (device.TryGetFeatureValue(CommonUsages.gripButton, out bool pressed) && pressed)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
