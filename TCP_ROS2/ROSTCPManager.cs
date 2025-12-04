@@ -11,7 +11,8 @@ using System.Collections.Generic;      // 用於 XR Input 裝置列表
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.EventSystems;
-using UnityEngine.XR;                 // 用於讀取手把側鍵狀態
+using UnityEngine.XR;                 // 用於讀取手把側鍵狀態 (備援)
+using UnityEngine.InputSystem;        // 用於可在 Inspector 選擇的按鍵 / 手把按鈕
 
 /// <summary>
 /// 統一的 ROS TCP 連接管理器 - 修正版
@@ -154,8 +155,10 @@ public class ROSTCPManager : MonoBehaviour
     };
 
     [Header("VR 手把側鍵控制")]
-    [Tooltip("開啟後，只有按住 VR 手把側鍵時才會自動發送關節 / 夾爪訊息到 ROS2")]
+    [Tooltip("開啟後，只有按住指定的 Input Action（按鍵/手把按鈕）時才會自動發送關節 / 夾爪訊息到 ROS2")]
     public bool requireSideButtonToSend = true;
+    [Tooltip("選擇一個 Input Action 作為「按住才發送資料」的側鍵（例如 XR Grip、Trigger 或鍵盤按鍵）")]
+    public InputActionReference sideButtonAction;
 
     // 單例模式
     private static ROSTCPManager instance;
@@ -175,6 +178,24 @@ public class ROSTCPManager : MonoBehaviour
             instance = this;
         else if (instance != this)
             Destroy(gameObject);
+    }
+
+    void OnEnable()
+    {
+        // 啟用側鍵 Input Action（可在 Inspector 選擇）
+        if (sideButtonAction != null && sideButtonAction.action != null)
+        {
+            sideButtonAction.action.Enable();
+        }
+    }
+
+    void OnDisable()
+    {
+        // 停用側鍵 Input Action
+        if (sideButtonAction != null && sideButtonAction.action != null)
+        {
+            sideButtonAction.action.Disable();
+        }
     }
 
     void Start()
@@ -1154,10 +1175,28 @@ public class ROSTCPManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 檢查是否有任一 VR 手把側鍵（gripButton）被按下
+    /// 檢查是否有側鍵被按下（優先使用 Input Action，可在 Inspector 選擇；若未設定則退回 XR Grip 偵測）
     /// </summary>
     bool IsControllerSideButtonPressed()
     {
+        // 1) 優先使用可在 Inspector 指定的 Input Action（與 OpenArmSimpleCalibrator 類似）
+        if (sideButtonAction != null && sideButtonAction.action != null)
+        {
+            try
+            {
+                // IsPressed() 適用於按鍵 / 手把按鈕類型的 Action
+                if (sideButtonAction.action.IsPressed())
+                {
+                    return true;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"⚠️ 讀取 sideButtonAction 狀態失敗，改用 XR Grip 偵測: {ex.Message}");
+            }
+        }
+
+        // 2) 若沒有設定 Input Action，或上述失敗，則使用 XR Grip Button 作為備援（維持舊行為）
         xrControllers.Clear();
 
         // 取得所有「手持控制器」類型的 XR 裝置
