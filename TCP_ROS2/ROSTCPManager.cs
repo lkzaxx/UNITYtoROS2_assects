@@ -36,7 +36,7 @@ public class ROSTCPManager : MonoBehaviour
     [Header("OpenArm Retarget 自動發送")]
     public OpenArmRetarget retarget;                 // OpenArmRetarget 引用
     public bool autoSendJointStates = false;         // 是否自動發送關節狀態
-    public float jointStateSendInterval = 0.1f;      // 發送間隔（秒）
+    public float jointStateSendInterval = 0.5f;      // 發送間隔（秒）
     public bool showJointValuesOnScreen = true;      // 在螢幕上顯示關節值
     [Tooltip("左臂關節名稱（7個）")]
     public string[] leftJointNames = new string[7] {
@@ -53,7 +53,7 @@ public class ROSTCPManager : MonoBehaviour
     [Tooltip("右手夾爪（GripperHoldToOpenPrismatic）")]
     public GripperHoldToOpenPrismatic rightGripper;
     public bool autoSendGripperEE = true;            // 是否自動發送 L_EE/R_EE
-    public float gripperSendInterval = 0.05f;        // 發送間隔（秒）
+    public float gripperSendInterval = 0.1f;        // 發送間隔（秒）
     [Tooltip("夾爪 JointState 名稱")]
     public string leftEEName = "L_EE";
     public string rightEEName = "R_EE";
