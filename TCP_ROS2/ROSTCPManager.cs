@@ -101,7 +101,7 @@ public class ROSTCPManager : MonoBehaviour
     private float lastGripperSendTime = 0f;
 
     // XR 手把裝置快取（用來檢查側鍵狀態）
-    private static readonly List<InputDevice> xrControllers = new List<InputDevice>();
+    private static readonly List<UnityEngine.XR.InputDevice> xrControllers = new List<UnityEngine.XR.InputDevice>();
 
     // IP 配置界面相關
     private GameObject ipConfigCanvasInstance;
@@ -1205,9 +1205,9 @@ public class ROSTCPManager : MonoBehaviour
             xrControllers
         );
 
-        foreach (var device in xrControllers)
+        foreach (UnityEngine.XR.InputDevice device in xrControllers)
         {
-            if (device.TryGetFeatureValue(CommonUsages.gripButton, out bool pressed) && pressed)
+            if (device.TryGetFeatureValue(UnityEngine.XR.CommonUsages.gripButton, out bool pressed) && pressed)
             {
                 return true;
             }
