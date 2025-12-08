@@ -39,12 +39,24 @@ public class OpenArmJointTester : MonoBehaviour
     private int currentJointIndex = -1; // -1 表示回零位
     private ArmJoints currentArm = null;
     private string lastAction = "Ready";
+    
+    // 持續設定目標角度（確保機器人移動）
+    private float[] leftTargetAngles = new float[7];
+    private float[] rightTargetAngles = new float[7];
+    private bool isTestingActive = false;
 
     void Start()
     {
         // 初始化所有關節驅動器參數
         InitializeJointDrives(leftArm);
         InitializeJointDrives(rightArm);
+        
+        // 初始化目標角度為零
+        for (int i = 0; i < 7; i++)
+        {
+            leftTargetAngles[i] = 0f;
+            rightTargetAngles[i] = 0f;
+        }
 
         UpdateStatusText();
         
@@ -56,6 +68,31 @@ public class OpenArmJointTester : MonoBehaviour
         Debug.Log("R: 切換到右手測試");
         Debug.Log("Space: 當前關節回零");
         Debug.Log("========================");
+    }
+    
+    void FixedUpdate()
+    {
+        // 持續設定目標角度到關節（確保移動）
+        ApplyTargetAngles(leftArm, leftTargetAngles);
+        ApplyTargetAngles(rightArm, rightTargetAngles);
+    }
+    
+    void ApplyTargetAngles(ArmJoints arm, float[] targetAngles)
+    {
+        if (arm == null || arm.joints == null || targetAngles == null) return;
+        
+        for (int i = 0; i < Mathf.Min(arm.joints.Length, targetAngles.Length); i++)
+        {
+            var joint = arm.joints[i];
+            if (joint == null) continue;
+            
+            var drive = joint.xDrive;
+            drive.stiffness = stiffness;
+            drive.damping = damping;
+            drive.forceLimit = forceLimit;
+            drive.target = targetAngles[i];
+            joint.xDrive = drive;
+        }
     }
 
     void Update()
@@ -206,8 +243,22 @@ public class OpenArmJointTester : MonoBehaviour
 
         var joint = arm.joints[jointIndex];
         if (joint == null) return;
+        
+        // 更新目標角度數組
+        if (arm == leftArm)
+        {
+            leftTargetAngles[jointIndex] = angleDeg;
+        }
+        else if (arm == rightArm)
+        {
+            rightTargetAngles[jointIndex] = angleDeg;
+        }
 
+        // 立即設定一次
         var drive = joint.xDrive;
+        drive.stiffness = stiffness;
+        drive.damping = damping;
+        drive.forceLimit = forceLimit;
         drive.target = angleDeg;
         joint.xDrive = drive;
 
@@ -304,7 +355,10 @@ public class OpenArmJointTester : MonoBehaviour
     {
         if (statusText != null) return; // 如果有 UI Text 就不顯示 OnGUI
 
-        GUILayout.BeginArea(new Rect(10, 10, 400, 400));
+        // 介面在右上角
+        float panelWidth = 410f;
+        float panelHeight = 480f;
+        GUILayout.BeginArea(new Rect(Screen.width - panelWidth - 10, 10, panelWidth, panelHeight));
         GUILayout.BeginVertical("box");
 
         GUILayout.Label("=== OpenArm 關節測試工具 ===", new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold });
