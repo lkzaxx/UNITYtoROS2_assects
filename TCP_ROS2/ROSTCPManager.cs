@@ -749,7 +749,7 @@ public class ROSTCPManager : MonoBehaviour
         if (ros == null) return;
 
         float left = GetJawTargetMeters(leftGripper, leftGripper != null ? leftGripper.leftJaw : null);
-        float right = GetJawTargetMeters(rightGripper, rightGripper != null ? rightGripper.leftJaw : null);
+        float right = GetJawTargetMeters(rightGripper, rightGripper != null ? rightGripper.rightJaw : null);
 
         // 夾爪行程限制（0 ~ 0.0425 m）
         left = Mathf.Clamp(left, gripperMin, gripperMax);
@@ -1276,35 +1276,39 @@ public class ROSTCPManager : MonoBehaviour
             return;
         }
 
-        float[] anglesRad = new float[joints.Length];
-        bool hasValidJoints = false;
+        // 🔧 只收集「真的有綁定 joint」的關節，避免把未綁定的關節硬拉到 0 rad
+        List<string> validNames = new List<string>();
+        List<float> validAngles = new List<float>();
 
-        // 讀取關節角度並轉換為弧度
         for (int i = 0; i < joints.Length; i++)
         {
-            if (joints[i]?.joint != null)
+            if (joints[i]?.joint == null)
             {
-                var drive = joints[i].joint.xDrive;
-                float angleDeg = drive.target;
-                float angleRad = angleDeg * Mathf.Deg2Rad;  // 度 → 弧度
+                // 沒綁定實體關節，跳過這個 slot
+                continue;
+            }
 
-                // 套用上下限檢查
-                angleRad = ClampJointAngle(angleRad, i, isLeft);
-                anglesRad[i] = angleRad;
-                hasValidJoints = true;
-            }
-            else
-            {
-                anglesRad[i] = 0f;
-            }
+            var drive = joints[i].joint.xDrive;
+            float angleDeg = drive.target;
+            float angleRad = angleDeg * Mathf.Deg2Rad;  // 度 → 弧度
+
+            // 套用上下限檢查
+            angleRad = ClampJointAngle(angleRad, i, isLeft);
+
+            validNames.Add(jointNames[i]);
+            validAngles.Add(angleRad);
         }
 
-        if (!hasValidJoints) return;
+        if (validNames.Count == 0)
+        {
+            Debug.LogWarning($"⚠️ {side} 沒有任何有效關節可發送");
+            return;
+        }
 
         // 發送到 ROS2
         try
         {
-            PublishJointCommands(jointNames, anglesRad);
+            PublishJointCommands(validNames.ToArray(), validAngles.ToArray());
         }
         catch (System.Exception ex)
         {
