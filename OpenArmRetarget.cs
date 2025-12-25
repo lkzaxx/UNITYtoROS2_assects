@@ -17,6 +17,10 @@ public class OpenArmRetarget : MonoBehaviour
         public Axis sourceAxis = Axis.X;        // 取該骨骼的哪一個 local Euler 軸
         public bool useNeutralCalibration = true;
         public Vector3 neutralEulerLocal;       // 校準時紀錄的 localEulerAngles
+        
+        [Tooltip("使用 Swing-Twist 四元數分解來讀取角度，可避免歐拉角奇異點問題")]
+        public bool useSwingTwistDecomposition = false;  // 四元數分解開關
+        Quaternion _neutralRotation;            // 校準時紀錄的四元數（用於 SwingTwist 模式）
 
         [Header("Mapping")]
         public float scale = 1f;                // 角度比例（可用 -1 反向）
@@ -50,37 +54,112 @@ public class OpenArmRetarget : MonoBehaviour
         {
             if (source == null) return;
             neutralEulerLocal = source.localEulerAngles;
+            _neutralRotation = source.localRotation;  // 同時記錄四元數
         }
 
         public float ReadSourceAngleDegRaw()
         {
             if (source == null) return 0f;
-            var e = source.localEulerAngles;
-
-            // 轉成 -180..180，避免 0/360 跳變
-            float sx = Mathf.DeltaAngle(0f, e.x);
-            float sy = Mathf.DeltaAngle(0f, e.y);
-            float sz = Mathf.DeltaAngle(0f, e.z);
 
             float raw = 0f;
-            switch (sourceAxis)
-            {
-                case Axis.X: raw = sx; break;
-                case Axis.Y: raw = sy; break;
-                default:     raw = sz; break;
-            }
 
-            if (useNeutralCalibration)
+            if (useSwingTwistDecomposition)
             {
-                var ne = neutralEulerLocal;
-                float nx = Mathf.DeltaAngle(0f, ne.x);
-                float ny = Mathf.DeltaAngle(0f, ne.y);
-                float nz = Mathf.DeltaAngle(0f, ne.z);
-                float nAxis = sourceAxis == Axis.X ? nx : (sourceAxis == Axis.Y ? ny : nz);
-                raw = Mathf.DeltaAngle(nAxis, raw); // 以校準姿勢為 0 度
+                // 使用 Swing-Twist 四元數分解（避免歐拉角奇異點）
+                Quaternion currentRot = source.localRotation;
+                
+                // 如果有中性校準，計算相對旋轉
+                if (useNeutralCalibration)
+                {
+                    currentRot = Quaternion.Inverse(_neutralRotation) * currentRot;
+                }
+                
+                raw = GetTwistAngle(currentRot, sourceAxis);
+            }
+            else
+            {
+                // 原本的歐拉角方式
+                var e = source.localEulerAngles;
+
+                // 轉成 -180..180，避免 0/360 跳變
+                float sx = Mathf.DeltaAngle(0f, e.x);
+                float sy = Mathf.DeltaAngle(0f, e.y);
+                float sz = Mathf.DeltaAngle(0f, e.z);
+
+                switch (sourceAxis)
+                {
+                    case Axis.X: raw = sx; break;
+                    case Axis.Y: raw = sy; break;
+                    default:     raw = sz; break;
+                }
+
+                if (useNeutralCalibration)
+                {
+                    var ne = neutralEulerLocal;
+                    float nx = Mathf.DeltaAngle(0f, ne.x);
+                    float ny = Mathf.DeltaAngle(0f, ne.y);
+                    float nz = Mathf.DeltaAngle(0f, ne.z);
+                    float nAxis = sourceAxis == Axis.X ? nx : (sourceAxis == Axis.Y ? ny : nz);
+                    raw = Mathf.DeltaAngle(nAxis, raw); // 以校準姿勢為 0 度
+                }
             }
 
             return raw;
+        }
+
+        /// <summary>
+        /// 使用 Swing-Twist 分解，從四元數中提取繞指定軸的旋轉角度
+        /// 這個方法不會受到歐拉角奇異點（Gimbal Lock）的影響
+        /// </summary>
+        float GetTwistAngle(Quaternion rotation, Axis axis)
+        {
+            // 根據軸向決定扭轉軸
+            Vector3 twistAxis = axis == Axis.X ? Vector3.right :
+                                axis == Axis.Y ? Vector3.up : Vector3.forward;
+
+            // 從四元數中提取旋轉軸向量
+            Vector3 rotationAxis = new Vector3(rotation.x, rotation.y, rotation.z);
+            
+            // 將旋轉軸投影到扭轉軸上
+            Vector3 projected = Vector3.Project(rotationAxis, twistAxis);
+            
+            // 重建只包含扭轉分量的四元數
+            Quaternion twist = new Quaternion(projected.x, projected.y, projected.z, rotation.w);
+            
+            // 處理接近零的情況
+            float magnitude = Mathf.Sqrt(twist.x * twist.x + twist.y * twist.y + 
+                                        twist.z * twist.z + twist.w * twist.w);
+            if (magnitude < 0.0001f)
+            {
+                return 0f;
+            }
+            
+            // 正規化
+            twist.x /= magnitude;
+            twist.y /= magnitude;
+            twist.z /= magnitude;
+            twist.w /= magnitude;
+            
+            // 確保 w 為正（取最短路徑）
+            if (twist.w < 0)
+            {
+                twist.x = -twist.x;
+                twist.y = -twist.y;
+                twist.z = -twist.z;
+                twist.w = -twist.w;
+            }
+
+            // 轉成角度（四元數角度 = 2 * acos(w)）
+            float angle = 2f * Mathf.Acos(Mathf.Clamp(twist.w, -1f, 1f)) * Mathf.Rad2Deg;
+            
+            // 判斷旋轉方向
+            if (Vector3.Dot(projected, twistAxis) < 0)
+            {
+                angle = -angle;
+            }
+
+            // 轉成 -180 ~ 180 範圍
+            return Mathf.DeltaAngle(0f, angle);
         }
 
         public void Apply(float deltaTime)
