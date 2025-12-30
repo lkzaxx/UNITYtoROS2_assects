@@ -5,12 +5,11 @@ using RosMessageTypes.Sensor;
 using System;
 
 /// <summary>
-/// 接收 ROS2 CompressedImage 並顯示到 Unity UI
+/// 接收 ROS2 CompressedImage 並顯示到 VR 雙眼
 /// 
-/// 使用方式：
-/// 1. 將此腳本附加到 GameObject
-/// 2. 設定 leftEyeImage 和/或 rightEyeImage (RawImage 組件)
-/// 3. 選擇顯示模式 (左眼/右眼/雙眼)
+/// 支援兩種模式：
+/// 1. UI 模式：顯示到 RawImage (測試用)
+/// 2. VR 模式：顯示到 Camera 的 RenderTexture (正式 VR 使用)
 /// 
 /// Topics:
 ///   /camera/left/compressed  - 左眼影像
@@ -18,48 +17,72 @@ using System;
 /// </summary>
 public class CameraStreamReceiver : MonoBehaviour
 {
-    [Header("顯示設定")]
+    [Header("=== 模式選擇 ===")]
+    [Tooltip("使用 VR Camera 模式還是 UI RawImage 模式")]
+    public RenderMode renderMode = RenderMode.UI;
+    
+    public enum RenderMode
+    {
+        UI,         // 使用 RawImage 顯示（測試用）
+        VRCamera    // 使用 Camera + RenderTexture（VR 用）
+    }
+
+    [Header("=== UI 模式設定 ===")]
     [Tooltip("左眼影像顯示的 RawImage")]
     public RawImage leftEyeImage;
     
     [Tooltip("右眼影像顯示的 RawImage")]
     public RawImage rightEyeImage;
+
+    [Header("=== VR Camera 模式設定 ===")]
+    [Tooltip("左眼 Camera（會在前方顯示 Quad）")]
+    public Camera leftEyeCamera;
     
-    [Tooltip("顯示模式")]
-    public DisplayMode displayMode = DisplayMode.Both;
+    [Tooltip("右眼 Camera（會在前方顯示 Quad）")]
+    public Camera rightEyeCamera;
     
-    [Header("Topic 設定")]
+    [Tooltip("Quad 距離 Camera 的距離")]
+    public float quadDistance = 1.0f;
+
+    [Header("=== Topic 設定 ===")]
     [Tooltip("左眼相機 Topic")]
     public string leftCameraTopic = "/camera/left/compressed";
     
     [Tooltip("右眼相機 Topic")]
     public string rightCameraTopic = "/camera/right/compressed";
     
-    [Header("狀態")]
-    [SerializeField] private bool leftConnected = false;
-    [SerializeField] private bool rightConnected = false;
+    [Tooltip("啟用左眼")]
+    public bool enableLeft = true;
+    
+    [Tooltip("啟用右眼")]
+    public bool enableRight = true;
+
+    [Header("=== 狀態監控 ===")]
+    [SerializeField] private bool rosConnected = false;
+    [SerializeField] private bool leftReceiving = false;
+    [SerializeField] private bool rightReceiving = false;
     [SerializeField] private int leftFrameCount = 0;
     [SerializeField] private int rightFrameCount = 0;
     [SerializeField] private float leftFps = 0f;
     [SerializeField] private float rightFps = 0f;
-
-    public enum DisplayMode
-    {
-        LeftOnly,   // 只顯示左眼
-        RightOnly,  // 只顯示右眼
-        Both        // 雙眼都顯示
-    }
 
     // 內部變數
     private ROSConnection ros;
     private Texture2D leftTexture;
     private Texture2D rightTexture;
     
+    // VR 模式用的 Quad
+    private GameObject leftQuad;
+    private GameObject rightQuad;
+    private Material leftMaterial;
+    private Material rightMaterial;
+    
     // FPS 計算
     private float leftLastTime;
     private float rightLastTime;
     private int leftFramesInSecond = 0;
     private int rightFramesInSecond = 0;
+    private float lastLogTime = 0f;
 
     // 執行緒安全的資料緩衝
     private byte[] pendingLeftData = null;
@@ -69,28 +92,136 @@ public class CameraStreamReceiver : MonoBehaviour
 
     void Start()
     {
+        Debug.Log("[CameraStreamReceiver] === 初始化開始 ===");
+        Debug.Log($"[CameraStreamReceiver] Render Mode: {renderMode}");
+        Debug.Log($"[CameraStreamReceiver] Left Topic: {leftCameraTopic}");
+        Debug.Log($"[CameraStreamReceiver] Right Topic: {rightCameraTopic}");
+        
         // 取得 ROS 連接
-        ros = ROSConnection.GetOrCreateInstance();
+        try
+        {
+            ros = ROSConnection.GetOrCreateInstance();
+            rosConnected = true;
+            Debug.Log("[CameraStreamReceiver] ROS Connection 取得成功");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[CameraStreamReceiver] ROS Connection 失敗: {e.Message}");
+            return;
+        }
         
         // 初始化 Texture
         leftTexture = new Texture2D(2, 2);
         rightTexture = new Texture2D(2, 2);
         
-        // 根據模式訂閱 Topic
-        if (displayMode == DisplayMode.LeftOnly || displayMode == DisplayMode.Both)
+        // 根據模式初始化顯示
+        if (renderMode == RenderMode.VRCamera)
         {
-            ros.Subscribe<CompressedImageMsg>(leftCameraTopic, OnLeftImageReceived);
-            Debug.Log($"[CameraStreamReceiver] Subscribed to {leftCameraTopic}");
+            SetupVRMode();
+        }
+        else
+        {
+            SetupUIMode();
         }
         
-        if (displayMode == DisplayMode.RightOnly || displayMode == DisplayMode.Both)
+        // 訂閱 Topic
+        if (enableLeft)
+        {
+            ros.Subscribe<CompressedImageMsg>(leftCameraTopic, OnLeftImageReceived);
+            Debug.Log($"[CameraStreamReceiver] ✓ 已訂閱 {leftCameraTopic}");
+        }
+        
+        if (enableRight)
         {
             ros.Subscribe<CompressedImageMsg>(rightCameraTopic, OnRightImageReceived);
-            Debug.Log($"[CameraStreamReceiver] Subscribed to {rightCameraTopic}");
+            Debug.Log($"[CameraStreamReceiver] ✓ 已訂閱 {rightCameraTopic}");
         }
         
         leftLastTime = Time.time;
         rightLastTime = Time.time;
+        lastLogTime = Time.time;
+        
+        Debug.Log("[CameraStreamReceiver] === 初始化完成，等待影像... ===");
+    }
+
+    /// <summary>
+    /// 設定 UI 模式
+    /// </summary>
+    private void SetupUIMode()
+    {
+        if (enableLeft && leftEyeImage == null)
+        {
+            Debug.LogWarning("[CameraStreamReceiver] UI 模式：leftEyeImage 未設定！");
+        }
+        if (enableRight && rightEyeImage == null)
+        {
+            Debug.LogWarning("[CameraStreamReceiver] UI 模式：rightEyeImage 未設定！");
+        }
+    }
+
+    /// <summary>
+    /// 設定 VR Camera 模式 - 在每個 Camera 前方建立 Quad
+    /// </summary>
+    private void SetupVRMode()
+    {
+        Debug.Log("[CameraStreamReceiver] 設定 VR Camera 模式...");
+        
+        if (enableLeft)
+        {
+            if (leftEyeCamera == null)
+            {
+                Debug.LogWarning("[CameraStreamReceiver] VR 模式：leftEyeCamera 未設定！");
+            }
+            else
+            {
+                leftQuad = CreateDisplayQuad("LeftEyeQuad", leftEyeCamera, out leftMaterial);
+                Debug.Log("[CameraStreamReceiver] ✓ 左眼 Quad 建立完成");
+            }
+        }
+        
+        if (enableRight)
+        {
+            if (rightEyeCamera == null)
+            {
+                Debug.LogWarning("[CameraStreamReceiver] VR 模式：rightEyeCamera 未設定！");
+            }
+            else
+            {
+                rightQuad = CreateDisplayQuad("RightEyeQuad", rightEyeCamera, out rightMaterial);
+                Debug.Log("[CameraStreamReceiver] ✓ 右眼 Quad 建立完成");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 建立顯示用的 Quad
+    /// </summary>
+    private GameObject CreateDisplayQuad(string name, Camera targetCamera, out Material material)
+    {
+        GameObject quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        quad.name = name;
+        
+        // 設定為 Camera 的子物件
+        quad.transform.SetParent(targetCamera.transform);
+        quad.transform.localPosition = new Vector3(0, 0, quadDistance);
+        quad.transform.localRotation = Quaternion.identity;
+        
+        // 計算 Quad 大小以填滿視野
+        float height = 2.0f * quadDistance * Mathf.Tan(targetCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        float width = height * targetCamera.aspect;
+        quad.transform.localScale = new Vector3(width, height, 1);
+        
+        // 移除 Collider
+        Destroy(quad.GetComponent<Collider>());
+        
+        // 建立材質
+        material = new Material(Shader.Find("Unlit/Texture"));
+        quad.GetComponent<Renderer>().material = material;
+        
+        // 設定 Layer（可選，避免被其他 Camera 看到）
+        quad.layer = targetCamera.gameObject.layer;
+        
+        return quad;
     }
 
     void Update()
@@ -108,10 +239,10 @@ public class CameraStreamReceiver : MonoBehaviour
         
         if (leftData != null)
         {
-            UpdateTexture(leftData, leftTexture, leftEyeImage);
+            ProcessImage(leftData, leftTexture, leftEyeImage, leftMaterial, "Left");
             leftFrameCount++;
             leftFramesInSecond++;
-            leftConnected = true;
+            leftReceiving = true;
         }
         
         // 處理右眼影像 (主執行緒)
@@ -127,14 +258,14 @@ public class CameraStreamReceiver : MonoBehaviour
         
         if (rightData != null)
         {
-            UpdateTexture(rightData, rightTexture, rightEyeImage);
+            ProcessImage(rightData, rightTexture, rightEyeImage, rightMaterial, "Right");
             rightFrameCount++;
             rightFramesInSecond++;
-            rightConnected = true;
+            rightReceiving = true;
         }
         
-        // 計算 FPS (每秒更新)
-        UpdateFpsCalculation();
+        // 計算 FPS 和定期 Log
+        UpdateFpsAndLog();
     }
 
     /// <summary>
@@ -160,12 +291,13 @@ public class CameraStreamReceiver : MonoBehaviour
     }
 
     /// <summary>
-    /// 更新 Texture 並顯示到 RawImage
+    /// 處理並顯示影像
     /// </summary>
-    private void UpdateTexture(byte[] imageData, Texture2D texture, RawImage targetImage)
+    private void ProcessImage(byte[] imageData, Texture2D texture, RawImage uiImage, Material vrMaterial, string side)
     {
         if (imageData == null || imageData.Length == 0)
         {
+            Debug.LogWarning($"[CameraStreamReceiver] {side}: 收到空資料");
             return;
         }
         
@@ -174,26 +306,38 @@ public class CameraStreamReceiver : MonoBehaviour
             // 解碼 JPEG
             if (texture.LoadImage(imageData))
             {
-                if (targetImage != null)
+                if (renderMode == RenderMode.UI)
                 {
-                    targetImage.texture = texture;
+                    // UI 模式
+                    if (uiImage != null)
+                    {
+                        uiImage.texture = texture;
+                    }
+                }
+                else
+                {
+                    // VR Camera 模式
+                    if (vrMaterial != null)
+                    {
+                        vrMaterial.mainTexture = texture;
+                    }
                 }
             }
             else
             {
-                Debug.LogWarning("[CameraStreamReceiver] Failed to decode image");
+                Debug.LogWarning($"[CameraStreamReceiver] {side}: JPEG 解碼失敗");
             }
         }
         catch (Exception e)
         {
-            Debug.LogError($"[CameraStreamReceiver] Error updating texture: {e.Message}");
+            Debug.LogError($"[CameraStreamReceiver] {side} 錯誤: {e.Message}");
         }
     }
 
     /// <summary>
-    /// 更新 FPS 計算
+    /// 更新 FPS 計算和定期 Log
     /// </summary>
-    private void UpdateFpsCalculation()
+    private void UpdateFpsAndLog()
     {
         float currentTime = Time.time;
         
@@ -212,46 +356,57 @@ public class CameraStreamReceiver : MonoBehaviour
             rightFramesInSecond = 0;
             rightLastTime = currentTime;
         }
+        
+        // 每 5 秒輸出狀態
+        if (currentTime - lastLogTime >= 5.0f)
+        {
+            Debug.Log($"[CameraStreamReceiver] 狀態: Left={leftFrameCount} frames ({leftFps:F1} fps), Right={rightFrameCount} frames ({rightFps:F1} fps)");
+            lastLogTime = currentTime;
+        }
     }
 
     /// <summary>
-    /// 取得連接狀態
+    /// 取得狀態
     /// </summary>
-    public bool IsLeftConnected => leftConnected;
-    public bool IsRightConnected => rightConnected;
-    
-    /// <summary>
-    /// 取得 FPS
-    /// </summary>
+    public bool IsLeftReceiving => leftReceiving;
+    public bool IsRightReceiving => rightReceiving;
     public float LeftFps => leftFps;
     public float RightFps => rightFps;
 
     void OnDestroy()
     {
-        // 清理 Texture
-        if (leftTexture != null)
-        {
-            Destroy(leftTexture);
-        }
-        if (rightTexture != null)
-        {
-            Destroy(rightTexture);
-        }
+        // 清理資源
+        if (leftTexture != null) Destroy(leftTexture);
+        if (rightTexture != null) Destroy(rightTexture);
+        if (leftQuad != null) Destroy(leftQuad);
+        if (rightQuad != null) Destroy(rightQuad);
+        if (leftMaterial != null) Destroy(leftMaterial);
+        if (rightMaterial != null) Destroy(rightMaterial);
     }
 
     /// <summary>
-    /// 在 Inspector 顯示狀態 (Editor only)
+    /// 在 Game 視窗顯示除錯資訊
     /// </summary>
     void OnGUI()
     {
-        #if UNITY_EDITOR
-        if (!Application.isPlaying) return;
+        GUIStyle style = new GUIStyle();
+        style.fontSize = 16;
+        style.normal.textColor = Color.white;
         
-        GUILayout.BeginArea(new Rect(10, 10, 250, 100));
-        GUILayout.Label($"Left Camera: {(leftConnected ? "Connected" : "Waiting...")} ({leftFps:F1} fps)");
-        GUILayout.Label($"Right Camera: {(rightConnected ? "Connected" : "Waiting...")} ({rightFps:F1} fps)");
-        GUILayout.Label($"Total Frames: L={leftFrameCount} R={rightFrameCount}");
+        GUILayout.BeginArea(new Rect(10, 10, 350, 150));
+        
+        GUI.color = rosConnected ? Color.green : Color.red;
+        GUILayout.Label($"ROS: {(rosConnected ? "Connected" : "Disconnected")}", style);
+        
+        GUI.color = leftReceiving ? Color.green : Color.yellow;
+        GUILayout.Label($"Left:  {(leftReceiving ? "Receiving" : "Waiting...")} | {leftFps:F1} fps | {leftFrameCount} frames", style);
+        
+        GUI.color = rightReceiving ? Color.green : Color.yellow;
+        GUILayout.Label($"Right: {(rightReceiving ? "Receiving" : "Waiting...")} | {rightFps:F1} fps | {rightFrameCount} frames", style);
+        
+        GUI.color = Color.white;
+        GUILayout.Label($"Mode: {renderMode}", style);
+        
         GUILayout.EndArea();
-        #endif
     }
 }
