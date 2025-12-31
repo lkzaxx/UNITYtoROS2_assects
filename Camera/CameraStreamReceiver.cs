@@ -286,6 +286,9 @@ public class CameraStreamReceiver : MonoBehaviour
     /// </summary>
     private void OnLeftImageReceived(CompressedImageMsg msg)
     {
+        // 調試：確認回調被觸發
+        Debug.Log($"[CameraStreamReceiver] 🎥 收到左眼影像！大小: {msg.data?.Length ?? 0} bytes");
+        
         lock (leftLock)
         {
             pendingLeftData = msg.data;
@@ -297,6 +300,9 @@ public class CameraStreamReceiver : MonoBehaviour
     /// </summary>
     private void OnRightImageReceived(CompressedImageMsg msg)
     {
+        // 調試：確認回調被觸發
+        Debug.Log($"[CameraStreamReceiver] 🎥 收到右眼影像！大小: {msg.data?.Length ?? 0} bytes");
+        
         lock (rightLock)
         {
             pendingRightData = msg.data;
