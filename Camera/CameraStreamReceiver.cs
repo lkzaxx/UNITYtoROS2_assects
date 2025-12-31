@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Sensor;
 using System;
+using System.Collections;
 
 /// <summary>
 /// 接收 ROS2 CompressedImage 並顯示到 VR 雙眼
@@ -97,19 +98,6 @@ public class CameraStreamReceiver : MonoBehaviour
         Debug.Log($"[CameraStreamReceiver] Left Topic: {leftCameraTopic}");
         Debug.Log($"[CameraStreamReceiver] Right Topic: {rightCameraTopic}");
         
-        // 取得 ROS 連接
-        try
-        {
-            ros = ROSConnection.GetOrCreateInstance();
-            rosConnected = true;
-            Debug.Log("[CameraStreamReceiver] ROS Connection 取得成功");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[CameraStreamReceiver] ROS Connection 失敗: {e.Message}");
-            return;
-        }
-        
         // 初始化 Texture
         leftTexture = new Texture2D(2, 2);
         rightTexture = new Texture2D(2, 2);
@@ -124,6 +112,35 @@ public class CameraStreamReceiver : MonoBehaviour
             SetupUIMode();
         }
         
+        leftLastTime = Time.time;
+        rightLastTime = Time.time;
+        lastLogTime = Time.time;
+        
+        // 延遲訂閱，確保 ROSTCPManager 已經初始化完成
+        StartCoroutine(DelayedSubscribe());
+    }
+
+    /// <summary>
+    /// 延遲訂閱 - 等待 ROSTCPManager 初始化完成
+    /// </summary>
+    IEnumerator DelayedSubscribe()
+    {
+        Debug.Log("[CameraStreamReceiver] 等待 1.5 秒讓 ROSTCPManager 初始化...");
+        yield return new WaitForSeconds(1.5f);
+        
+        // 取得 ROS 連接
+        try
+        {
+            ros = ROSConnection.GetOrCreateInstance();
+            rosConnected = true;
+            Debug.Log("[CameraStreamReceiver] ROS Connection 取得成功");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[CameraStreamReceiver] ROS Connection 失敗: {e.Message}");
+            yield break;
+        }
+        
         // 訂閱 Topic
         if (enableLeft)
         {
@@ -136,10 +153,6 @@ public class CameraStreamReceiver : MonoBehaviour
             ros.Subscribe<CompressedImageMsg>(rightCameraTopic, OnRightImageReceived);
             Debug.Log($"[CameraStreamReceiver] ✓ 已訂閱 {rightCameraTopic}");
         }
-        
-        leftLastTime = Time.time;
-        rightLastTime = Time.time;
-        lastLogTime = Time.time;
         
         Debug.Log("[CameraStreamReceiver] === 初始化完成，等待影像... ===");
     }
