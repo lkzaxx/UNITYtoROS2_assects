@@ -19,9 +19,11 @@ using UnityEngine.InputSystem;        // 用於可在 Inspector 選擇的按鍵 
 /// </summary>
 public class ROSTCPManager : MonoBehaviour
 {
-    [Header("連接設定")]
-    public string rosIPAddress = "127.0.0.1";
-    public int rosPort = 10000;
+    [Header("連接設定（僅供顯示，實際連接由 Project Settings 配置）")]
+    [Tooltip("顯示用 - 實際 IP 請在 Edit → Project Settings → Robotics → ROS TCP Connector 設定")]
+    [SerializeField] private string rosIPAddress = "192.168.0.15";  // 僅供 UI 顯示
+    [Tooltip("顯示用 - 實際 Port 請在 Edit → Project Settings → Robotics → ROS TCP Connector 設定")]
+    [SerializeField] private int rosPort = 10000;  // 僅供 UI 顯示
     public float heartbeatInterval = 1.0f;
     public float connectionTimeout = 5.0f;
 
@@ -71,19 +73,7 @@ public class ROSTCPManager : MonoBehaviour
     public int messagesReceived = 0;
     public string lastStatusMessage = "";
 
-    [Header("VR IP 配置界面")]
-    [Tooltip("是否顯示 IP 配置界面")]
-    public bool showIPConfigUI = true;
-    [Tooltip("IP 配置 Canvas Prefab（可選，留空則動態創建）")]
-    public GameObject ipConfigCanvasPrefab;
-    [Tooltip("虛擬鍵盤 Prefab（可選）")]
-    public GameObject virtualKeyboardPrefab;
-    [Tooltip("TextMeshPro 字體資源（必須指定！）")]
-    public TMP_FontAsset tmpFont;  // 🔥 新增：讓用戶手動指定字體
-    [Tooltip("界面位置（相對於主攝像機）")]
-    public Vector3 uiPosition = new Vector3(0, 1.6f, 2f);
-    [Tooltip("界面縮放")]
-    public Vector3 uiScale = new Vector3(0.001f, 0.001f, 0.001f);
+    // VR IP 配置界面已移至 ROSIPConfigUI.cs
 
     // ROS TCP Connector
     private ROSConnection ros;
@@ -103,17 +93,7 @@ public class ROSTCPManager : MonoBehaviour
     // XR 手把裝置快取（用來檢查側鍵狀態）
     private static readonly List<UnityEngine.XR.InputDevice> xrControllers = new List<UnityEngine.XR.InputDevice>();
 
-    // IP 配置界面相關
-    private GameObject ipConfigCanvasInstance;
-    private TMP_InputField ipAddressInputField;
-    private TMP_InputField portInputField;
-    private Button applyButton;
-    private Button cancelButton;
-    private Button toggleButton;
-    private VirtualKeyboard virtualKeyboard;
-    private bool isIPConfigUIVisible = false;
-    private string tempIPAddress;
-    private int tempPort;
+    // IP 配置界面相關變數已移至 ROSIPConfigUI.cs
 
     // OpenArm 關節上下限（弧度）- 區分左右手 (ROS2 openarm_bimanual_control.urdf)
     private readonly float[] leftJointMinLimits = new float[7] {
@@ -212,12 +192,8 @@ public class ROSTCPManager : MonoBehaviour
     {
         Debug.Log("🚀 ROSTCPManager 啟動...");
 
-        // 初始化 IP 配置界面
-        if (showIPConfigUI)
-        {
-            InitializeIPConfigUI();
-        }
-
+        // IP 配置界面已移至 ROSIPConfigUI.cs
+        
         StartCoroutine(DelayedInitialization());
     }
 
@@ -269,6 +245,9 @@ public class ROSTCPManager : MonoBehaviour
             {
                 Debug.LogWarning("⚠️ ROS 連接線程尚未啟動，請確認 Project Settings 中 Connect on Startup = true");
             }
+            
+            // 嘗試從 ROSConnection 讀取實際連接信息（用於 UI 顯示）
+            UpdateDisplayIPFromROSConnection();
 
             // 註冊訂閱者
             RegisterSubscribers();
@@ -332,6 +311,41 @@ public class ROSTCPManager : MonoBehaviour
                 Debug.LogError("   5. 在 Edit → Project Settings → Robotics → ROS Settings 中手動設定連接參數");
                 isConnected = false;
             }
+        }
+    }
+
+    /// <summary>
+    /// 從 ROSConnection 讀取實際的 IP/Port（用於 UI 顯示）
+    /// </summary>
+    void UpdateDisplayIPFromROSConnection()
+    {
+        if (ros == null) return;
+        
+        try
+        {
+            var rosType = ros.GetType();
+            
+            // 讀取 IP
+            var ipField = rosType.GetField("m_RosIPAddress",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (ipField != null)
+            {
+                rosIPAddress = ipField.GetValue(ros) as string ?? rosIPAddress;
+            }
+            
+            // 讀取 Port
+            var portField = rosType.GetField("m_RosPort",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (portField != null)
+            {
+                rosPort = (int)portField.GetValue(ros);
+            }
+            
+            Debug.Log($"📡 ROS 連接目標: {rosIPAddress}:{rosPort}（來自 Project Settings）");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning($"無法讀取 ROSConnection 連接信息: {ex.Message}");
         }
     }
 
@@ -1357,875 +1371,10 @@ public class ROSTCPManager : MonoBehaviour
 
     #endregion
 
-    #region VR IP 配置界面
-
-    /// <summary>
-    /// 初始化 IP 配置界面
-    /// </summary>
-    void InitializeIPConfigUI()
-    {
-        // 如果提供了 Prefab，使用 Prefab
-        if (ipConfigCanvasPrefab != null)
-        {
-            ipConfigCanvasInstance = Instantiate(ipConfigCanvasPrefab);
-            SetupIPConfigUIFromPrefab();
-        }
-        else
-        {
-            // 否則動態創建
-            CreateIPConfigUI();
-        }
-
-        // 初始化臨時值
-        tempIPAddress = rosIPAddress;
-        tempPort = rosPort;
-
-        // 更新界面顯示
-        UpdateIPConfigUI();
-
-        // 在 Play 模式下默認顯示界面
-        if (ipConfigCanvasInstance != null)
-        {
-            ipConfigCanvasInstance.SetActive(true);
-            isIPConfigUIVisible = true;
-
-            Debug.Log($"✅ IP 配置界面已創建並顯示");
-            Debug.Log($"   位置: {ipConfigCanvasInstance.transform.position}");
-            Debug.Log($"   縮放: {ipConfigCanvasInstance.transform.localScale}");
-            Debug.Log($"   如果看不到界面，請檢查位置和縮放設置");
-        }
-        else
-        {
-            Debug.LogError("❌ IP 配置界面創建失敗！");
-        }
-    }
-
-    /// <summary>
-    /// 從 Prefab 設置 UI（如果提供了 Prefab）
-    /// </summary>
-    void SetupIPConfigUIFromPrefab()
-    {
-        // 查找組件
-        ipAddressInputField = ipConfigCanvasInstance.GetComponentInChildren<TMP_InputField>();
-        if (ipAddressInputField == null)
-        {
-            TMP_InputField[] inputs = ipConfigCanvasInstance.GetComponentsInChildren<TMP_InputField>();
-            if (inputs.Length > 0) ipAddressInputField = inputs[0];
-            if (inputs.Length > 1) portInputField = inputs[1];
-        }
-
-        Button[] buttons = ipConfigCanvasInstance.GetComponentsInChildren<Button>();
-        foreach (Button btn in buttons)
-        {
-            string btnName = btn.name.ToLower();
-            if (btnName.Contains("apply") || btnName.Contains("確認") || btnName.Contains("應用"))
-                applyButton = btn;
-            else if (btnName.Contains("cancel") || btnName.Contains("取消"))
-                cancelButton = btn;
-            else if (btnName.Contains("toggle") || btnName.Contains("顯示") || btnName.Contains("隱藏"))
-                toggleButton = btn;
-        }
-
-        virtualKeyboard = ipConfigCanvasInstance.GetComponentInChildren<VirtualKeyboard>();
-
-        // 綁定按鈕事件
-        if (applyButton != null)
-            applyButton.onClick.AddListener(OnApplyIPConfig);
-        if (cancelButton != null)
-            cancelButton.onClick.AddListener(OnCancelIPConfig);
-        if (toggleButton != null)
-            toggleButton.onClick.AddListener(OnToggleIPConfigUI);
-    }
-
-    /// <summary>
-    /// 動態創建 IP 配置界面
-    /// </summary>
-    void CreateIPConfigUI()
-    {
-        // 創建 Canvas（World Space，適合 VR）
-        GameObject canvasObj = new GameObject("IPConfigCanvas");
-        Canvas canvas = canvasObj.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.WorldSpace;
-
-        // 嘗試找到 XR Camera
-        Camera xrCamera = Camera.main;
-        if (xrCamera == null)
-        {
-            xrCamera = FindFirstObjectByType<Camera>();
-        }
-        canvas.worldCamera = xrCamera;
-
-        // 添加 Canvas Scaler
-        CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-
-        // 添加 Graphic Raycaster（用於手柄射線交互）
-        canvasObj.AddComponent<GraphicRaycaster>();
-
-        // 確保有 EventSystem（Unity UI 需要）
-        if (FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
-        {
-            GameObject eventSystemObj = new GameObject("EventSystem");
-            eventSystemObj.AddComponent<UnityEngine.EventSystems.EventSystem>();
-            eventSystemObj.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
-        }
-
-        // 自動配置 XR Ray Interactor（如果存在）
-        ConfigureXRRayInteractors();
-
-        // 設置 Canvas 位置和縮放
-        canvasObj.transform.position = uiPosition;
-        canvasObj.transform.localScale = uiScale;
-
-        // 創建背景面板
-        GameObject panel = CreateUIElement("Panel", canvasObj.transform);
-        Image panelImage = panel.AddComponent<Image>();
-        panelImage.color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
-        SetRectTransform(panel, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-
-        // 創建標題
-        CreateTextLabel(panel.transform, "Title", "ROS TCP Connection Config",
-            new Vector2(0, 200), new Vector2(800, 60), 36, TextAlignmentOptions.Center);
-
-        // 創建 IP 地址標籤和輸入框
-        CreateTextLabel(panel.transform, "IPLabel", "IP Address:",
-            new Vector2(-250, 120), new Vector2(150, 40), 24, TextAlignmentOptions.Left);
-
-        GameObject ipInputObj = CreateInputField(panel.transform, "IPInput",
-            new Vector2(0, 120), new Vector2(400, 50), rosIPAddress);
-        ipAddressInputField = ipInputObj.GetComponent<TMP_InputField>();
-        ipAddressInputField.onSelect.AddListener((string value) => ShowVirtualKeyboard(ipAddressInputField));
-
-        // 創建端口標籤和輸入框
-        CreateTextLabel(panel.transform, "PortLabel", "Port:",
-            new Vector2(-250, 40), new Vector2(150, 40), 24, TextAlignmentOptions.Left);
-
-        GameObject portInputObj = CreateInputField(panel.transform, "PortInput",
-            new Vector2(0, 40), new Vector2(200, 50), rosPort.ToString());
-        portInputField = portInputObj.GetComponent<TMP_InputField>();
-        portInputField.contentType = TMP_InputField.ContentType.IntegerNumber;
-        portInputField.onSelect.AddListener((string value) => ShowVirtualKeyboard(portInputField));
-
-        // 創建按鈕
-        applyButton = CreateButton(panel.transform, "ApplyButton", "Apply",
-            new Vector2(-100, -60), new Vector2(150, 50), OnApplyIPConfig);
-
-        cancelButton = CreateButton(panel.transform, "CancelButton", "Cancel",
-            new Vector2(100, -60), new Vector2(150, 50), OnCancelIPConfig);
-
-        // 創建切換按鈕（用於顯示/隱藏界面）
-        toggleButton = CreateButton(panel.transform, "ToggleButton", "Show Config",
-            new Vector2(0, -140), new Vector2(200, 50), OnToggleIPConfigUI);
-
-        // 添加 VR 交互支持
-        AddVRInteractionSupport(ipInputObj);
-        AddVRInteractionSupport(portInputObj);
-        AddVRInteractionSupport(applyButton.gameObject);
-        AddVRInteractionSupport(cancelButton.gameObject);
-        AddVRInteractionSupport(toggleButton.gameObject);
-
-        ipConfigCanvasInstance = canvasObj;
-    }
-
-    /// <summary>
-    /// 創建 UI 元素（通用）
-    /// </summary>
-    GameObject CreateUIElement(string name, Transform parent)
-    {
-        GameObject obj = new GameObject(name);
-        obj.transform.SetParent(parent, false);
-        return obj;
-    }
-
-    /// <summary>
-    /// 設置 RectTransform
-    /// </summary>
-    void SetRectTransform(GameObject obj, Vector2 anchorMin, Vector2 anchorMax,
-        Vector2 sizeDelta, Vector2 anchoredPosition)
-    {
-        RectTransform rect = obj.GetComponent<RectTransform>();
-        if (rect == null) rect = obj.AddComponent<RectTransform>();
-        rect.anchorMin = anchorMin;
-        rect.anchorMax = anchorMax;
-        rect.sizeDelta = sizeDelta;
-        rect.anchoredPosition = anchoredPosition;
-    }
-
-/// <summary>
-/// 創建文字標籤（修正 TMP 字體問題）
-/// </summary>
-GameObject CreateTextLabel(Transform parent, string name, string text,
-    Vector2 position, Vector2 size, int fontSize, TextAlignmentOptions alignment)
-{
-    GameObject labelObj = CreateUIElement(name, parent);
-
-    TextMeshProUGUI textComp = labelObj.AddComponent<TextMeshProUGUI>();
-    textComp.text = text;
-    textComp.fontSize = fontSize;
-    textComp.alignment = alignment;
-    textComp.color = Color.white;
-    
-    // 🔥 關鍵修正：確保載入 TMP 字體
-    if (TMP_Settings.defaultFontAsset != null)
-    {
-        textComp.font = TMP_Settings.defaultFontAsset;
-    }
-    else
-    {
-        // 嘗試載入 TMP 內建字體
-        TMP_FontAsset tmpFont = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
-        if (tmpFont == null)
-        {
-            tmpFont = Resources.Load<TMP_FontAsset>("TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF");
-        }
-        if (tmpFont != null)
-        {
-            textComp.font = tmpFont;
-        }
-        else
-        {
-            Debug.LogWarning("⚠️ 找不到 TextMeshPro 字體資源，請導入 TMP Essentials");
-        }
-    }
-
-    SetRectTransform(labelObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
-
-    return labelObj;
-}
-
-
-/// <summary>
-/// 載入 TextMeshPro 字體（解決藍色框 T 字問題）
-/// </summary>
-void LoadTMPFont(TextMeshProUGUI textComponent)
-{
-    if (textComponent == null) return;
-
-    // 🔥 最優先：使用手動指定的字體
-    if (tmpFont != null)
-    {
-        textComponent.font = tmpFont;
-        Debug.Log($"✅ 使用手動指定的 TMP 字體: {tmpFont.name}");
-        return;
-    }
-
-    // 優先使用默認字體
-    if (TMP_Settings.defaultFontAsset != null)
-    {
-        textComponent.font = TMP_Settings.defaultFontAsset;
-        Debug.Log($"✅ 使用 TMP 默認字體: {TMP_Settings.defaultFontAsset.name}");
-        return;
-    }
-
-    // 嘗試載入常見的 TMP 字體路徑
-    string[] fontPaths = new string[]
-    {
-        "Fonts & Materials/LiberationSans SDF",
-        "TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF",
-        "TextMesh Pro/Fonts/LiberationSans SDF",
-        "TMP/Fonts/LiberationSans SDF",
-        "TextMesh Pro/Resources/Fonts & Materials/LiberationSans - OFL SDF"  // 新路徑
-    };
-
-    foreach (string path in fontPaths)
-    {
-        TMP_FontAsset font = Resources.Load<TMP_FontAsset>(path);
-        if (font != null)
-        {
-            textComponent.font = font;
-            Debug.Log($"✅ 成功載入 TMP 字體: {path}");
-            return;
-        }
-    }
-
-    // 如果還是找不到，嘗試查找任何可用的 TMP 字體
-    TMP_FontAsset[] allFonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
-    if (allFonts.Length > 0)
-    {
-        textComponent.font = allFonts[0];
-        Debug.Log($"✅ 使用找到的 TMP 字體: {allFonts[0].name}");
-        return;
-    }
-
-    Debug.LogError("❌ 找不到任何 TextMeshPro 字體！請執行以下步驟：\n" +
-                   "1. Window > TextMeshPro > Import TMP Essential Resources\n" +
-                   "2. 在 Inspector 中手動指定 tmpFont 字體資源\n" +
-                   "3. 或手動添加 TMP 字體到 Resources 資料夾");
-}
-
-
-/// <summary>
-/// 創建輸入框（修正 TMP 字體問題）
-/// </summary>
-GameObject CreateInputField(Transform parent, string name,
-    Vector2 position, Vector2 size, string placeholderText)
-{
-    GameObject inputObj = CreateUIElement(name, parent);
-
-    Image bgImage = inputObj.AddComponent<Image>();
-    bgImage.color = new Color(0.2f, 0.2f, 0.2f, 1f);
-
-    TMP_InputField inputField = inputObj.AddComponent<TMP_InputField>();
-    SetRectTransform(inputObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
-
-    // 創建文字區域
-    GameObject textArea = CreateUIElement("TextArea", inputObj.transform);
-    RectTransform textAreaRect = textArea.AddComponent<RectTransform>();
-    SetRectTransform(textArea, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-
-    // 創建文字組件
-    GameObject textObj = CreateUIElement("Text", textArea.transform);
-    TextMeshProUGUI textComp = textObj.AddComponent<TextMeshProUGUI>();
-    textComp.text = "";
-    textComp.fontSize = 24;
-    textComp.color = Color.white;
-    textComp.alignment = TextAlignmentOptions.MidlineLeft;
-    
-    // 🔥 關鍵修正：載入字體
-    LoadTMPFont(textComp);
-
-    RectTransform textRect = textObj.GetComponent<RectTransform>();
-    SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-    textRect.offsetMin = new Vector2(10, 5);
-    textRect.offsetMax = new Vector2(-10, -5);
-
-    // 創建佔位符
-    GameObject placeholderObj = CreateUIElement("Placeholder", textArea.transform);
-    TextMeshProUGUI placeholderComp = placeholderObj.AddComponent<TextMeshProUGUI>();
-    placeholderComp.text = placeholderText;
-    placeholderComp.fontSize = 24;
-    placeholderComp.color = new Color(0.5f, 0.5f, 0.5f, 1f);
-    placeholderComp.alignment = TextAlignmentOptions.MidlineLeft;
-    
-    // 🔥 載入字體
-    LoadTMPFont(placeholderComp);
-
-    RectTransform placeholderRect = placeholderObj.GetComponent<RectTransform>();
-    SetRectTransform(placeholderObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-    placeholderRect.offsetMin = new Vector2(10, 5);
-    placeholderRect.offsetMax = new Vector2(-10, -5);
-
-    // 設置 InputField
-    inputField.textViewport = textAreaRect;
-    inputField.textComponent = textComp;
-    inputField.placeholder = placeholderComp;
-
-    return inputObj;
-}
-
-/// <summary>
-/// 創建按鈕（修正字體問題）
-/// </summary>
-Button CreateButton(Transform parent, string name, string text,
-    Vector2 position, Vector2 size, UnityEngine.Events.UnityAction onClick)
-{
-    GameObject buttonObj = CreateUIElement(name, parent);
-
-    Image buttonImage = buttonObj.AddComponent<Image>();
-    buttonImage.color = new Color(0.2f, 0.5f, 0.8f, 1f);
-
-    Button button = buttonObj.AddComponent<Button>();
-    button.onClick.AddListener(onClick);
-
-    // 創建按鈕文字
-    GameObject textObj = CreateUIElement("Text", buttonObj.transform);
-    TextMeshProUGUI textComp = textObj.AddComponent<TextMeshProUGUI>();
-    textComp.text = text;
-    textComp.fontSize = 24;
-    textComp.color = Color.white;
-    textComp.alignment = TextAlignmentOptions.Center;
-    
-    // 🔥 載入字體
-    LoadTMPFont(textComp);
-
-    SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-    SetRectTransform(buttonObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
-
-    return button;
-}
-
-    /// <summary>
-    /// 自動配置 XR Ray Interactor
-    /// </summary>
-    void ConfigureXRRayInteractors()
-    {
-#if UNITY_XR_INTERACTION_TOOLKIT
-        try
-        {
-            // 使用反射來查找 XR Ray Interactor（因為類型名稱可能因版本而異）
-            System.Type rayInteractorType = System.Type.GetType("UnityEngine.XR.Interaction.Toolkit.XRRayInteractor, Unity.XR.Interaction.Toolkit");
-            if (rayInteractorType == null)
-            {
-                rayInteractorType = System.Type.GetType("UnityEngine.XR.Interaction.Toolkit.Interactables.XRRayInteractor, Unity.XR.Interaction.Toolkit");
-            }
-            
-            if (rayInteractorType != null)
-            {
-                // 查找所有 XR Ray Interactor
-                UnityEngine.Object[] rayInteractors = FindObjectsByType(rayInteractorType, FindObjectsSortMode.None);
-                
-                if (rayInteractors.Length > 0)
-                {
-                    // 查找或創建 XR Interaction Manager
-                    System.Type managerType = System.Type.GetType("UnityEngine.XR.Interaction.Toolkit.XRInteractionManager, Unity.XR.Interaction.Toolkit");
-                    if (managerType == null)
-                    {
-                        managerType = System.Type.GetType("UnityEngine.XR.Interaction.Toolkit.InteractionManager, Unity.XR.Interaction.Toolkit");
-                    }
-                    
-                    UnityEngine.Component interactionManager = null;
-                    if (managerType != null)
-                    {
-                        interactionManager = FindFirstObjectByType(managerType) as UnityEngine.Component;
-                        if (interactionManager == null)
-                        {
-                            GameObject managerObj = new GameObject("XR Interaction Manager");
-                            interactionManager = managerObj.AddComponent(managerType) as UnityEngine.Component;
-                        }
-                    }
-                    
-                    // 配置每個 Ray Interactor
-                    foreach (UnityEngine.Object obj in rayInteractors)
-                    {
-                        if (obj == null) continue;
-                        
-                        // 使用反射設置屬性
-                        var interactionManagerProp = rayInteractorType.GetProperty("interactionManager");
-                        if (interactionManagerProp != null && interactionManager != null)
-                        {
-                            var currentManager = interactionManagerProp.GetValue(obj);
-                            if (currentManager == null)
-                            {
-                                interactionManagerProp.SetValue(obj, interactionManager);
-                            }
-                        }
-                        
-                        // 設置 Ray Origin Transform
-                        var rayOriginProp = rayInteractorType.GetProperty("rayOriginTransform");
-                        if (rayOriginProp != null)
-                        {
-                            var currentOrigin = rayOriginProp.GetValue(obj) as Transform;
-                            if (currentOrigin == null)
-                            {
-                                rayOriginProp.SetValue(obj, (obj as MonoBehaviour).transform);
-                            }
-                        }
-                        
-                        // 啟用 UI Interaction
-                        var uiInteractionProp = rayInteractorType.GetProperty("enableUIInteraction");
-                        if (uiInteractionProp != null)
-                        {
-                            uiInteractionProp.SetValue(obj, true);
-                        }
-                        
-                        Debug.Log($"✅ 已配置 XR Ray Interactor: {(obj as MonoBehaviour).name}");
-                    }
-                }
-            }
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogWarning($"⚠️ 配置 XR Ray Interactor 時發生錯誤: {ex.Message}");
-            Debug.LogWarning($"   這可能是因為 XR Interaction Toolkit 版本不同或未安裝");
-        }
-#else
-        Debug.Log("ℹ️ XR Interaction Toolkit 未安裝或未啟用，跳過自動配置");
-#endif
-    }
-
-    /// <summary>
-    /// 添加 VR 交互支持（使用 XR Interaction Toolkit 或 Unity UI 事件）
-    /// </summary>
-    void AddVRInteractionSupport(GameObject uiElement)
-    {
-        // 方法1: 嘗試添加 XR Simple Interactable（如果使用 XR Interaction Toolkit）
-#if UNITY_XR_INTERACTION_TOOLKIT
-        try
-        {
-            var interactable = uiElement.GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable>();
-            if (interactable == null)
-            {
-                interactable = uiElement.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable>();
-            }
-        }
-        catch (System.Exception)
-        {
-            // XR Interaction Toolkit 不可用，使用其他方法
-        }
-#endif
-
-        // 方法2: 添加 EventTrigger 支持手柄射線點擊
-        EventTrigger trigger = uiElement.GetComponent<EventTrigger>();
-        if (trigger == null)
-        {
-            trigger = uiElement.AddComponent<EventTrigger>();
-        }
-
-        // 對於按鈕，添加點擊事件
-        Button btn = uiElement.GetComponent<Button>();
-        if (btn != null)
-        {
-            // 添加 Pointer Click 事件
-            EventTrigger.Entry clickEntry = new EventTrigger.Entry();
-            clickEntry.eventID = EventTriggerType.PointerClick;
-            clickEntry.callback.AddListener((eventData) =>
-            {
-                btn.onClick.Invoke();
-            });
-            trigger.triggers.Add(clickEntry);
-        }
-
-        // 對於輸入框，添加選擇事件
-        TMP_InputField inputField = uiElement.GetComponent<TMP_InputField>();
-        if (inputField != null)
-        {
-            // 添加 Pointer Click 事件來選擇輸入框
-            EventTrigger.Entry clickEntry = new EventTrigger.Entry();
-            clickEntry.eventID = EventTriggerType.PointerClick;
-            clickEntry.callback.AddListener((eventData) =>
-            {
-                inputField.Select();
-                inputField.ActivateInputField();
-                ShowVirtualKeyboard(inputField);
-            });
-            trigger.triggers.Add(clickEntry);
-        }
-    }
-
-    /// <summary>
-    /// 顯示虛擬鍵盤
-    /// </summary>
-    void ShowVirtualKeyboard(TMP_InputField targetField)
-    {
-        // 如果提供了虛擬鍵盤 Prefab，實例化它
-        if (virtualKeyboardPrefab != null)
-        {
-            if (virtualKeyboard == null || !virtualKeyboard.gameObject.activeSelf)
-            {
-                GameObject keyboardObj = Instantiate(virtualKeyboardPrefab, ipConfigCanvasInstance.transform);
-                virtualKeyboard = keyboardObj.GetComponent<VirtualKeyboard>();
-                if (virtualKeyboard == null)
-                {
-                    virtualKeyboard = keyboardObj.AddComponent<VirtualKeyboard>();
-                }
-                keyboardObj.transform.localPosition = new Vector3(0, -300, 0);
-
-                // 修復虛擬鍵盤的字体問題
-                FixVirtualKeyboardFonts(keyboardObj);
-            }
-
-            if (virtualKeyboard != null)
-            {
-                virtualKeyboard.Show(targetField);
-            }
-        }
-        else
-        {
-            // 如果沒有 Prefab，動態創建簡單的虛擬鍵盤
-            CreateSimpleVirtualKeyboard(targetField);
-        }
-    }
-
-/// <summary>
-/// 修復虛擬鍵盤的字體問題
-/// </summary>
-void FixVirtualKeyboardFonts(GameObject keyboardObj)
-{
-    TextMeshProUGUI[] tmpComponents = keyboardObj.GetComponentsInChildren<TextMeshProUGUI>(true);
-    foreach (var tmpComp in tmpComponents)
-    {
-        if (tmpComp != null)
-        {
-            LoadTMPFont(tmpComp);
-        }
-    }
-}
-
-/// <summary>
-/// 創建簡單的虛擬鍵盤（完全使用 Unity Text）
-/// </summary>
-void CreateSimpleVirtualKeyboard(TMP_InputField targetField)
-{
-    if (ipConfigCanvasInstance == null) return;
-
-    // 創建鍵盤容器
-    GameObject keyboardPanel = CreateUIElement("VirtualKeyboard", ipConfigCanvasInstance.transform);
-    Image panelImage = keyboardPanel.AddComponent<Image>();
-    panelImage.color = new Color(0.15f, 0.15f, 0.15f, 0.95f);
-    SetRectTransform(keyboardPanel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-        new Vector2(600, 400), new Vector2(0, -300));
-
-    // 創建標題 - 改用 Unity Text 而非 TextMeshPro
-    GameObject titleObj = CreateUIElement("Title", keyboardPanel.transform);
-    Text titleText = titleObj.AddComponent<Text>();
-    titleText.text = "Virtual Keyboard";
-    titleText.fontSize = 28;
-    titleText.color = Color.white;
-    titleText.alignment = TextAnchor.MiddleCenter;
-    titleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-    SetRectTransform(titleObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 
-        new Vector2(500, 40), new Vector2(0, 160));
-
-    // 創建數字按鈕網格 (0-9 和 .)
-    float buttonSize = 80f;
-    float spacing = 10f;
-    float startX = -120f;
-    float startY = 80f;
-
-    // 第一行: 1, 2, 3
-    for (int i = 1; i <= 3; i++)
-    {
-        CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(),
-            new Vector2(startX + (i - 1) * (buttonSize + spacing), startY),
-            new Vector2(buttonSize, buttonSize));
-    }
-
-    // 第二行: 4, 5, 6
-    for (int i = 4; i <= 6; i++)
-    {
-        CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(),
-            new Vector2(startX + (i - 4) * (buttonSize + spacing), startY - (buttonSize + spacing)),
-            new Vector2(buttonSize, buttonSize));
-    }
-
-    // 第三行: 7, 8, 9
-    for (int i = 7; i <= 9; i++)
-    {
-        CreateKeyboardButton(keyboardPanel.transform, $"Key{i}", i.ToString(),
-            new Vector2(startX + (i - 7) * (buttonSize + spacing), startY - 2 * (buttonSize + spacing)),
-            new Vector2(buttonSize, buttonSize));
-    }
-
-    // 第四行: 0, .
-    CreateKeyboardButton(keyboardPanel.transform, "Key0", "0",
-        new Vector2(startX, startY - 3 * (buttonSize + spacing)),
-        new Vector2(buttonSize, buttonSize));
-    CreateKeyboardButton(keyboardPanel.transform, "KeyDot", ".",
-        new Vector2(startX + (buttonSize + spacing), startY - 3 * (buttonSize + spacing)),
-        new Vector2(buttonSize, buttonSize));
-
-    // 功能按鈕
-    CreateKeyboardButton(keyboardPanel.transform, "Backspace", "Del",
-        new Vector2(startX + 2 * (buttonSize + spacing), startY - 3 * (buttonSize + spacing)),
-        new Vector2(buttonSize, buttonSize));
-    CreateKeyboardButton(keyboardPanel.transform, "Clear", "Clear",
-        new Vector2(startX + 100, startY - 4 * (buttonSize + spacing)),
-        new Vector2(buttonSize * 1.5f, buttonSize));
-    CreateKeyboardButton(keyboardPanel.transform, "Confirm", "OK",
-        new Vector2(startX + 100 + (buttonSize * 1.5f + spacing), startY - 4 * (buttonSize + spacing)),
-        new Vector2(buttonSize * 1.5f, buttonSize));
-
-    // 添加 VirtualKeyboard 組件
-    VirtualKeyboard keyboard = keyboardPanel.AddComponent<VirtualKeyboard>();
-    keyboard.SetTargetInputField(targetField);
-    virtualKeyboard = keyboard;
-
-    // 不需要呼叫 FixVirtualKeyboardFonts，因為我們沒有使用 TextMeshPro
-
-    // 重新綁定所有按鈕
-    Button[] buttons = keyboardPanel.GetComponentsInChildren<Button>();
-    foreach (var btn in buttons)
-    {
-        btn.onClick.RemoveAllListeners();
-
-        string btnName = btn.name;
-        if (btnName.Contains("Key") && btnName != "KeyDot")
-        {
-            string numStr = btnName.Replace("Key", "");
-            if (int.TryParse(numStr, out int num))
-            {
-                btn.onClick.AddListener(() => keyboard.AddCharacter(num.ToString()));
-            }
-        }
-        else if (btnName == "KeyDot")
-        {
-            btn.onClick.AddListener(() => keyboard.AddCharacter("."));
-        }
-        else if (btnName == "Backspace")
-        {
-            btn.onClick.AddListener(() => keyboard.Backspace());
-        }
-        else if (btnName == "Clear")
-        {
-            btn.onClick.AddListener(() => keyboard.Clear());
-        }
-        else if (btnName == "Confirm")
-        {
-            btn.onClick.AddListener(() => keyboard.Confirm());
-        }
-
-        // 添加 VR 交互支持
-        AddVRInteractionSupport(btn.gameObject);
-    }
-}
-
-/// <summary>
-/// 創建鍵盤按鈕（保持使用 Unity Text）
-/// </summary>
-Button CreateKeyboardButton(Transform parent, string name, string text,
-    Vector2 position, Vector2 size)
-{
-    GameObject buttonObj = CreateUIElement(name, parent);
-
-    Image buttonImage = buttonObj.AddComponent<Image>();
-    buttonImage.color = new Color(0.3f, 0.3f, 0.3f, 1f);
-
-    Button button = buttonObj.AddComponent<Button>();
-
-    // 創建按鈕文字（使用 Unity Text）
-    GameObject textObj = CreateUIElement("Text", buttonObj.transform);
-    Text textComp = textObj.AddComponent<Text>();
-    textComp.text = text;
-    textComp.fontSize = 32;
-    textComp.color = Color.white;
-    textComp.alignment = TextAnchor.MiddleCenter;
-
-    // 使用 Unity 默認字體
-    Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-    if (defaultFont == null)
-    {
-        defaultFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
-    }
-    if (defaultFont != null)
-    {
-        textComp.font = defaultFont;
-    }
-
-    SetRectTransform(textObj, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-    SetRectTransform(buttonObj, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), size, position);
-
-    return button;
-}
-
-    /// <summary>
-    /// 更新 IP 配置界面顯示
-    /// </summary>
-    void UpdateIPConfigUI()
-    {
-        if (ipAddressInputField != null)
-        {
-            ipAddressInputField.text = tempIPAddress;
-        }
-
-        if (portInputField != null)
-        {
-            portInputField.text = tempPort.ToString();
-        }
-    }
-
-    /// <summary>
-    /// 應用 IP 配置
-    /// </summary>
-    void OnApplyIPConfig()
-    {
-        // 讀取輸入值
-        if (ipAddressInputField != null)
-        {
-            tempIPAddress = ipAddressInputField.text;
-        }
-
-        if (portInputField != null)
-        {
-            if (int.TryParse(portInputField.text, out int port))
-            {
-                tempPort = port;
-            }
-        }
-
-        // 驗證 IP 地址格式
-        if (IsValidIPAddress(tempIPAddress))
-        {
-            rosIPAddress = tempIPAddress;
-            rosPort = tempPort;
-
-            Debug.Log($"✅ IP 配置已更新: {rosIPAddress}:{rosPort}");
-
-            // 重新初始化連接
-            if (connectionInitialized)
-            {
-                Debug.Log("🔄 重新初始化 ROS 連接...");
-                connectionInitialized = false;
-                InitializeROSConnection();
-            }
-
-            // 隱藏界面
-            OnToggleIPConfigUI();
-        }
-        else
-        {
-            Debug.LogError($"❌ 無效的 IP 地址格式: {tempIPAddress}");
-        }
-    }
-
-    /// <summary>
-    /// 取消 IP 配置
-    /// </summary>
-    void OnCancelIPConfig()
-    {
-        // 恢復原始值
-        tempIPAddress = rosIPAddress;
-        tempPort = rosPort;
-        UpdateIPConfigUI();
-
-        // 隱藏界面
-        OnToggleIPConfigUI();
-    }
-
-    /// <summary>
-    /// 切換 IP 配置界面顯示
-    /// </summary>
-    void OnToggleIPConfigUI()
-    {
-        if (ipConfigCanvasInstance != null)
-        {
-            isIPConfigUIVisible = !isIPConfigUIVisible;
-            ipConfigCanvasInstance.SetActive(isIPConfigUIVisible);
-
-            if (toggleButton != null)
-            {
-                TextMeshProUGUI toggleText = toggleButton.GetComponentInChildren<TextMeshProUGUI>();
-                if (toggleText != null)
-                {
-                    toggleText.text = isIPConfigUIVisible ? "Hide Config" : "Show Config";
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// 驗證 IP 地址格式
-    /// </summary>
-    bool IsValidIPAddress(string ip)
-    {
-        if (string.IsNullOrEmpty(ip))
-            return false;
-
-        string[] parts = ip.Split('.');
-        if (parts.Length != 4)
-            return false;
-
-        foreach (string part in parts)
-        {
-            if (!int.TryParse(part, out int num) || num < 0 || num > 255)
-                return false;
-        }
-
-        return true;
-    }
-
-    #endregion
-
     void OnDestroy()
     {
         isHeartbeatActive = false;
         StopAllCoroutines();
-
-        // 清理 IP 配置界面
-        if (ipConfigCanvasInstance != null)
-        {
-            Destroy(ipConfigCanvasInstance);
-        }
 
         Debug.Log("🔄 ROSTCPManager 已停止");
     }
