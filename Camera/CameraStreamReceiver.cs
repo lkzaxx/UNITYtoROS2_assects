@@ -64,6 +64,8 @@ public class CameraStreamReceiver : MonoBehaviour
     [SerializeField] private bool rightReceiving = false;
     [SerializeField] private int leftFrameCount = 0;
     [SerializeField] private int rightFrameCount = 0;
+    [SerializeField] private int leftRxPackets = 0;  // callback 收到的封包數
+    [SerializeField] private int rightRxPackets = 0; // callback 收到的封包數
     [SerializeField] private float leftFps = 0f;
     [SerializeField] private float rightFps = 0f;
 
@@ -126,7 +128,7 @@ public class CameraStreamReceiver : MonoBehaviour
     IEnumerator DelayedSubscribe()
     {
         Debug.Log("[CameraStreamReceiver] 等待 1.5 秒讓 ROSTCPManager 初始化...");
-        yield return new WaitForSeconds(1.5f);
+        yield return new WaitForSecondsRealtime(1.5f);  // 使用 Realtime，不受 timeScale 影響
         
         // 取得 ROS 連接
         try
@@ -286,12 +288,21 @@ public class CameraStreamReceiver : MonoBehaviour
     /// </summary>
     private void OnLeftImageReceived(CompressedImageMsg msg)
     {
-        // 調試：確認回調被觸發
-        Debug.Log($"[CameraStreamReceiver] 🎥 收到左眼影像！大小: {msg.data?.Length ?? 0} bytes");
+        leftRxPackets++;
+        
+        // 節流 log：約每 4 秒一次 (15fps × 4 = 60)
+        if (leftRxPackets % 60 == 0)
+            Debug.Log($"[CameraStreamReceiver] Left RX packets={leftRxPackets}, bytes={msg.data?.Length ?? 0}, format={msg.format}");
+        
+        if (msg.data == null || msg.data.Length == 0) return;
+        
+        // 複製 byte[] 避免資料被覆寫
+        var copy = new byte[msg.data.Length];
+        Buffer.BlockCopy(msg.data, 0, copy, 0, msg.data.Length);
         
         lock (leftLock)
         {
-            pendingLeftData = msg.data;
+            pendingLeftData = copy;
         }
     }
 
@@ -300,12 +311,21 @@ public class CameraStreamReceiver : MonoBehaviour
     /// </summary>
     private void OnRightImageReceived(CompressedImageMsg msg)
     {
-        // 調試：確認回調被觸發
-        Debug.Log($"[CameraStreamReceiver] 🎥 收到右眼影像！大小: {msg.data?.Length ?? 0} bytes");
+        rightRxPackets++;
+        
+        // 節流 log：約每 4 秒一次 (15fps × 4 = 60)
+        if (rightRxPackets % 60 == 0)
+            Debug.Log($"[CameraStreamReceiver] Right RX packets={rightRxPackets}, bytes={msg.data?.Length ?? 0}, format={msg.format}");
+        
+        if (msg.data == null || msg.data.Length == 0) return;
+        
+        // 複製 byte[] 避免資料被覆寫
+        var copy = new byte[msg.data.Length];
+        Buffer.BlockCopy(msg.data, 0, copy, 0, msg.data.Length);
         
         lock (rightLock)
         {
-            pendingRightData = msg.data;
+            pendingRightData = copy;
         }
     }
 
@@ -419,9 +439,11 @@ public class CameraStreamReceiver : MonoBehaviour
         
         GUI.color = leftReceiving ? Color.green : Color.yellow;
         GUILayout.Label($"Left:  {(leftReceiving ? "Receiving" : "Waiting...")} | {leftFps:F1} fps | {leftFrameCount} frames", style);
+        GUILayout.Label($"Left RX packets: {leftRxPackets}", style);  // callback 封包計數
         
         GUI.color = rightReceiving ? Color.green : Color.yellow;
         GUILayout.Label($"Right: {(rightReceiving ? "Receiving" : "Waiting...")} | {rightFps:F1} fps | {rightFrameCount} frames", style);
+        GUILayout.Label($"Right RX packets: {rightRxPackets}", style);  // callback 封包計數
         
         GUI.color = Color.white;
         GUILayout.Label($"Mode: {renderMode}", style);
