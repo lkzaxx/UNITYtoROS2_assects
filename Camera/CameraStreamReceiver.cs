@@ -28,6 +28,10 @@ public class CameraStreamReceiver : MonoBehaviour
         VRCamera    // 使用 Camera + RenderTexture（VR 用）
     }
 
+    [Header("=== ROS Connection Override ===")]
+    [Tooltip("如果設定，將使用這個 ROSConnection 實例")]
+    [SerializeField] private ROSConnection rosOverride;
+
     [Header("=== UI 模式設定 ===")]
     [Tooltip("左眼影像顯示的 RawImage")]
     public RawImage leftEyeImage;
@@ -127,36 +131,36 @@ public class CameraStreamReceiver : MonoBehaviour
     /// </summary>
     IEnumerator DelayedSubscribe()
     {
-        Debug.Log("[CameraStreamReceiver] 等待 1.5 秒讓 ROSTCPManager 初始化...");
-        yield return new WaitForSecondsRealtime(1.5f);  // 使用 Realtime，不受 timeScale 影響
-        
-        // 取得 ROS 連接
-        try
+        Debug.Log("[CameraStreamReceiver] 等待 3.0 秒讓 ROSConnection 連線穩定...");
+        yield return new WaitForSecondsRealtime(3.0f);
+
+        Debug.Log("[CameraStreamReceiver] ROSConnection count = " + RosConn.CountROS());
+
+        ros = rosOverride != null ? rosOverride : RosConn.GetSceneROS();
+        if (ros == null)
         {
-            ros = ROSConnection.GetOrCreateInstance();
-            rosConnected = true;
-            Debug.Log("[CameraStreamReceiver] ROS Connection 取得成功");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[CameraStreamReceiver] ROS Connection 失敗: {e.Message}");
+            Debug.LogError("[CameraStreamReceiver] Scene 裡找不到 ROSConnection（請確認 Hierarchy 只有一顆，且已啟用）");
+            rosConnected = false;
             yield break;
         }
-        
+
+        rosConnected = true;
+        Debug.Log($"[CameraStreamReceiver] Using ROSConnection: {ros.gameObject.name} id={ros.GetInstanceID()}");
+
         // 訂閱 Topic
         if (enableLeft)
         {
             ros.Subscribe<CompressedImageMsg>(leftCameraTopic, OnLeftImageReceived);
-            Debug.Log($"[CameraStreamReceiver] ✓ 已訂閱 {leftCameraTopic}");
+            Debug.Log($"[CameraStreamReceiver] ✓ Subscribed {leftCameraTopic}");
         }
-        
+
         if (enableRight)
         {
             ros.Subscribe<CompressedImageMsg>(rightCameraTopic, OnRightImageReceived);
-            Debug.Log($"[CameraStreamReceiver] ✓ 已訂閱 {rightCameraTopic}");
+            Debug.Log($"[CameraStreamReceiver] ✓ Subscribed {rightCameraTopic}");
         }
-        
-        Debug.Log("[CameraStreamReceiver] === 初始化完成，等待影像... ===");
+
+        Debug.Log("[CameraStreamReceiver] === 訂閱完成，等待影像... ===");
     }
 
     /// <summary>
