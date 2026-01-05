@@ -225,54 +225,14 @@ public class ROSTCPManager : MonoBehaviour
 
             Debug.Log($"✅ ROS Connection 實例已建立");
 
-            // ========================================
-            // 【已簡化】不再使用反射設置 IP/Port
-            // 連接參數由 Project Settings 配置
-            // ========================================
-            
-            // ========================================
-            // 【已簡化】不再手動呼叫 Connect()
-            // 讓 ROSConnection 根據 Connect on Startup 設定自動連接
-            // 確保 Project Settings 中 Connect on Startup = true
-            // ========================================
-            
-            // 檢查連接狀態
-            if (ros.HasConnectionThread)
-            {
-                Debug.Log("✅ ROS 連接線程已在運行");
-            }
-            else
-            {
-                Debug.LogWarning("⚠️ ROS 連接線程尚未啟動，請確認 Project Settings 中 Connect on Startup = true");
-            }
-            
             // 嘗試從 ROSConnection 讀取實際連接信息（用於 UI 顯示）
             UpdateDisplayIPFromROSConnection();
-
-            // 註冊訂閱者
-            RegisterSubscribers();
-
-            // 註冊發布者
-            RegisterPublishers();
-
-            // 開始心跳
-            if (isHeartbeatActive)
-            {
-                StartCoroutine(HeartbeatCoroutine());
-            }
-
-            // 開始連接狀態檢查
-            StartCoroutine(ConnectionStatusCheck());
-
-            connectionInitialized = true;
-            isConnected = true;
-            Debug.Log("🎉 ROSTCPManager 初始化完成");
-
-            // 啟用自動發送關節狀態
-            if (autoSendJointStates && retarget != null)
-            {
-                Debug.Log("✅ 啟用 OpenArmRetarget 自動發送");
-            }
+            
+            // ========================================
+            // 【關鍵修正】等待連接建立後再註冊訂閱者
+            // 解決訂閱請求在連接建立前發送導致丟失的問題
+            // ========================================
+            StartCoroutine(WaitForConnectionAndRegister());
         }
         catch (System.Exception ex)
         {
@@ -285,6 +245,65 @@ public class ROSTCPManager : MonoBehaviour
             Invoke(nameof(InitializeROSConnection), 5.0f);
         }
     }
+    
+    /// <summary>
+    /// 等待連接建立後再註冊訂閱者和發布者
+    /// </summary>
+    IEnumerator WaitForConnectionAndRegister()
+    {
+        float timeout = 10.0f;
+        float elapsed = 0f;
+        
+        Debug.Log("🔄 等待 ROS 連接建立...");
+        
+        // 等待連接線程啟動
+        while (!ros.HasConnectionThread && elapsed < timeout)
+        {
+            yield return new WaitForSeconds(0.2f);
+            elapsed += 0.2f;
+        }
+        
+        if (!ros.HasConnectionThread)
+        {
+            Debug.LogError("❌ ROS 連接超時！請確認 Project Settings 中 Connect on Startup = true");
+            isConnected = false;
+            yield break;
+        }
+        
+        Debug.Log("✅ ROS 連接線程已啟動");
+        
+        // 額外等待一下，確保 TCP 連接完全建立
+        // 這是因為 HasConnectionThread=true 只表示線程開始，不保證連接已完成
+        yield return new WaitForSeconds(0.5f);
+        
+        Debug.Log("🔄 開始註冊訂閱者和發布者...");
+
+        // 註冊訂閱者
+        RegisterSubscribers();
+
+        // 註冊發布者
+        RegisterPublishers();
+
+        // 開始心跳
+        if (isHeartbeatActive)
+        {
+            StartCoroutine(HeartbeatCoroutine());
+        }
+
+        // 開始連接狀態檢查
+        StartCoroutine(ConnectionStatusCheck());
+
+        connectionInitialized = true;
+        isConnected = true;
+        Debug.Log("🎉 ROSTCPManager 初始化完成");
+
+        // 啟用自動發送關節狀態
+        if (autoSendJointStates && retarget != null)
+        {
+            Debug.Log("✅ 啟用 OpenArmRetarget 自動發送");
+        }
+    }
+
 
     /// <summary>
     /// 等待並檢查連接狀態
