@@ -176,10 +176,28 @@ public class EHandFingerReader : MonoBehaviour
         // 讀取手指角度
         if (enableLeftHand) ReadLeftFingers();
         if (enableRightHand) ReadRightFingers();
+        
+        // 測試模式：強制輸出指定值
+        if (forceTestMode)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                leftFingerValues[i] = forceTestValue;
+                rightFingerValues[i] = forceTestValue;
+            }
+        }
 
         // 發送 ROS 訊息
         PublishEHandCommands();
     }
+    
+    [Header("=== 強制測試模式 ===")]
+    [Tooltip("啟用後強制輸出指定值，用於測試靈巧手")]
+    public bool forceTestMode = false;
+    
+    [Tooltip("強制輸出的值 (0~1)")]
+    [Range(0f, 1f)]
+    public float forceTestValue = 1.0f;
 
     /// <summary>
     /// 讀取左手手指角度
