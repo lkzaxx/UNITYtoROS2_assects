@@ -67,10 +67,10 @@ public class EHandFingerReader : MonoBehaviour
 
     [Header("=== 手指角度映射 ===")]
     [Tooltip("完全張開時的角度 (度)")]
-    public float openAngle = 0f;
+    public float openAngle = -14f;
 
     [Tooltip("完全握緊時的角度 (度)")]
-    public float closeAngle = 90f;
+    public float closeAngle = -59f;
 
     [Header("=== 狀態監控 ===")]
     [SerializeField] private bool rosConnected = false;
@@ -213,7 +213,7 @@ public class EHandFingerReader : MonoBehaviour
     
     [Tooltip("使用的旋轉軸 (0=X, 1=Y, 2=Z)")]
     [Range(0, 2)]
-    public int bendAxis = 0;
+    public int bendAxis = 2;  // Z 軸（適用於 Meta Movement SDK）
     
     private float debugTimer = 0f;
 
