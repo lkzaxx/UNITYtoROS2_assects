@@ -204,8 +204,11 @@ public class EHandFingerReader : MonoBehaviour
     /// </summary>
     private void ReadLeftFingers()
     {
-        leftFingerValues[0] = GetFingerBend(leftThumbProximal);   // F1: 拇指旋轉
-        leftFingerValues[1] = GetFingerBend(leftThumbDistal);    // F2: 拇指伸縮
+        // 拇指：F1 用 Y 軸（旋轉），F2 用 Z 軸（彎曲），都用 ThumbProximal
+        leftFingerValues[0] = GetFingerBendAxis(leftThumbProximal, 1);  // F1: 拇指旋轉 (Y軸)
+        leftFingerValues[1] = GetFingerBendAxis(leftThumbProximal, 2);  // F2: 拇指彎曲 (Z軸)
+        
+        // 其他手指：用 Z 軸
         leftFingerValues[2] = GetFingerBend(leftIndexProximal);  // F3: 食指
         leftFingerValues[3] = GetFingerBend(leftMiddleProximal); // F4: 中指
         leftFingerValues[4] = GetFingerBend(leftRingProximal);   // F5: 無名指
@@ -217,12 +220,31 @@ public class EHandFingerReader : MonoBehaviour
     /// </summary>
     private void ReadRightFingers()
     {
-        rightFingerValues[0] = GetFingerBend(rightThumbProximal);   // F1: 拇指旋轉
-        rightFingerValues[1] = GetFingerBend(rightThumbDistal);    // F2: 拇指伸縮
+        // 拇指：F1 用 Y 軸（旋轉），F2 用 Z 軸（彎曲），都用 ThumbProximal
+        rightFingerValues[0] = GetFingerBendAxis(rightThumbProximal, 1);  // F1: 拇指旋轉 (Y軸)
+        rightFingerValues[1] = GetFingerBendAxis(rightThumbProximal, 2);  // F2: 拇指彎曲 (Z軸)
+        
+        // 其他手指：用 Z 軸
         rightFingerValues[2] = GetFingerBend(rightIndexProximal);  // F3: 食指
         rightFingerValues[3] = GetFingerBend(rightMiddleProximal); // F4: 中指
         rightFingerValues[4] = GetFingerBend(rightRingProximal);   // F5: 無名指
         rightFingerValues[5] = GetFingerBend(rightLittleProximal); // F6: 尾指
+    }
+    
+    /// <summary>
+    /// 計算手指彎曲程度（指定軸向）
+    /// </summary>
+    private float GetFingerBendAxis(Transform fingerBone, int axis)
+    {
+        if (fingerBone == null) return 0f;
+
+        Vector3 euler = fingerBone.localEulerAngles;
+        float angle = axis == 0 ? euler.x : (axis == 1 ? euler.y : euler.z);
+        
+        if (angle > 180f) angle -= 360f;
+
+        float bend = Mathf.InverseLerp(openAngle, closeAngle, angle);
+        return Mathf.Clamp01(bend);
     }
 
     [Header("=== 除錯 ===")]
