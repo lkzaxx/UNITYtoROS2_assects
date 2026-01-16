@@ -27,9 +27,28 @@ public class EHandFingerReader : MonoBehaviour
     [Tooltip("如果設定，將使用這個 ROSConnection 實例")]
     [SerializeField] private ROSConnection rosOverride;
 
-    [Header("=== Body Animator ===")]
-    [Tooltip("RealisticCharacter 的 Animator (Humanoid Avatar)")]
+    [Header("=== 骨骼來源（二選一）===")]
+    [Tooltip("使用 Animator 自動取得骨骼（傳統方式）")]
     public Animator bodyAnimator;
+    
+    [Tooltip("使用直接 Transform 參考（Meta Movement SDK 專用）")]
+    public bool useDirectTransforms = false;
+
+    [Header("=== 左手手指 Transform（直接參考模式）===")]
+    public Transform leftThumbProximal;
+    public Transform leftThumbDistal;
+    public Transform leftIndexProximal;
+    public Transform leftMiddleProximal;
+    public Transform leftRingProximal;
+    public Transform leftLittleProximal;
+
+    [Header("=== 右手手指 Transform（直接參考模式）===")]
+    public Transform rightThumbProximal;
+    public Transform rightThumbDistal;
+    public Transform rightIndexProximal;
+    public Transform rightMiddleProximal;
+    public Transform rightRingProximal;
+    public Transform rightLittleProximal;
 
     [Header("=== Topic 設定 ===")]
     [Tooltip("手指命令 Topic")]
@@ -59,12 +78,6 @@ public class EHandFingerReader : MonoBehaviour
     [SerializeField] private float[] leftFingerValues = new float[6];
     [SerializeField] private float[] rightFingerValues = new float[6];
 
-    // 手指骨骼
-    private Transform leftThumbProximal, leftThumbDistal;
-    private Transform leftIndexProximal, leftMiddleProximal, leftRingProximal, leftLittleProximal;
-    private Transform rightThumbProximal, rightThumbDistal;
-    private Transform rightIndexProximal, rightMiddleProximal, rightRingProximal, rightLittleProximal;
-
     // ROS
     private ROSConnection ros;
     private float lastPublishTime;
@@ -74,13 +87,18 @@ public class EHandFingerReader : MonoBehaviour
         Debug.Log("[EHandFingerReader] === 初始化開始 ===");
         
         // 取得手指骨骼
-        if (bodyAnimator != null && bodyAnimator.isHuman)
+        if (!useDirectTransforms && bodyAnimator != null && bodyAnimator.isHuman)
         {
-            InitializeFingerBones();
+            InitializeFromAnimator();
+        }
+        else if (useDirectTransforms)
+        {
+            Debug.Log("[EHandFingerReader] 使用直接 Transform 參考模式");
+            ValidateDirectTransforms();
         }
         else
         {
-            Debug.LogError("[EHandFingerReader] bodyAnimator 未設定或不是 Humanoid Avatar！");
+            Debug.LogWarning("[EHandFingerReader] 請設定 Body Animator 或啟用 Use Direct Transforms 並拖入骨骼");
         }
 
         // 延遲訂閱，確保 ROSConnection 已經初始化完成
@@ -88,9 +106,9 @@ public class EHandFingerReader : MonoBehaviour
     }
 
     /// <summary>
-    /// 初始化手指骨骼 Transform
+    /// 從 Animator 初始化手指骨骼 Transform（傳統方式）
     /// </summary>
-    private void InitializeFingerBones()
+    private void InitializeFromAnimator()
     {
         // 左手
         leftThumbProximal = bodyAnimator.GetBoneTransform(HumanBodyBones.LeftThumbProximal);
@@ -108,7 +126,15 @@ public class EHandFingerReader : MonoBehaviour
         rightRingProximal = bodyAnimator.GetBoneTransform(HumanBodyBones.RightRingProximal);
         rightLittleProximal = bodyAnimator.GetBoneTransform(HumanBodyBones.RightLittleProximal);
 
-        Debug.Log("[EHandFingerReader] 手指骨骼初始化完成");
+        Debug.Log("[EHandFingerReader] 從 Animator 初始化手指骨骼完成");
+        ValidateDirectTransforms();
+    }
+
+    /// <summary>
+    /// 驗證 Transform 參考
+    /// </summary>
+    private void ValidateDirectTransforms()
+    {
         Debug.Log($"  Left: Thumb={leftThumbProximal != null}, Index={leftIndexProximal != null}");
         Debug.Log($"  Right: Thumb={rightThumbProximal != null}, Index={rightIndexProximal != null}");
     }
