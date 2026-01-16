@@ -66,11 +66,24 @@ public class EHandFingerReader : MonoBehaviour
     public bool enableRightHand = true;
 
     [Header("=== 手指角度映射 ===")]
-    [Tooltip("完全張開時的角度 (度)")]
-    public float openAngle = -14f;
+    [Tooltip("完全張開時的角度 (度) - 一般手指")]
+    public float openAngle = -5f;
 
-    [Tooltip("完全握緊時的角度 (度)")]
-    public float closeAngle = -59f;
+    [Tooltip("完全握緊時的角度 (度) - 一般手指")]
+    public float closeAngle = -52f;
+    
+    [Header("=== 拇指專用角度 ===")]
+    [Tooltip("拇指 Y 軸（旋轉）張開角度")]
+    public float thumbRotateOpen = 10f;
+    
+    [Tooltip("拇指 Y 軸（旋轉）握緊角度")]
+    public float thumbRotateClose = 18f;
+    
+    [Tooltip("拇指 Z 軸（彎曲）張開角度")]
+    public float thumbBendOpen = -2f;
+    
+    [Tooltip("拇指 Z 軸（彎曲）握緊角度")]
+    public float thumbBendClose = -54f;
 
     [Header("=== 狀態監控 ===")]
     [SerializeField] private bool rosConnected = false;
@@ -204,11 +217,11 @@ public class EHandFingerReader : MonoBehaviour
     /// </summary>
     private void ReadLeftFingers()
     {
-        // 拇指：F1 用 Y 軸（旋轉），F2 用 Z 軸（彎曲），都用 ThumbProximal
-        leftFingerValues[0] = GetFingerBendAxis(leftThumbProximal, 1);  // F1: 拇指旋轉 (Y軸)
-        leftFingerValues[1] = GetFingerBendAxis(leftThumbProximal, 2);  // F2: 拇指彎曲 (Z軸)
+        // 拇指：使用專用角度設定
+        leftFingerValues[0] = GetThumbBend(leftThumbProximal, 1, thumbRotateOpen, thumbRotateClose);  // F1: 拇指旋轉 (Y軸)
+        leftFingerValues[1] = GetThumbBend(leftThumbProximal, 2, thumbBendOpen, thumbBendClose);      // F2: 拇指彎曲 (Z軸)
         
-        // 其他手指：用 Z 軸
+        // 其他手指：用 Z 軸和一般設定
         leftFingerValues[2] = GetFingerBend(leftIndexProximal);  // F3: 食指
         leftFingerValues[3] = GetFingerBend(leftMiddleProximal); // F4: 中指
         leftFingerValues[4] = GetFingerBend(leftRingProximal);   // F5: 無名指
@@ -220,11 +233,11 @@ public class EHandFingerReader : MonoBehaviour
     /// </summary>
     private void ReadRightFingers()
     {
-        // 拇指：F1 用 Y 軸（旋轉），F2 用 Z 軸（彎曲），都用 ThumbProximal
-        rightFingerValues[0] = GetFingerBendAxis(rightThumbProximal, 1);  // F1: 拇指旋轉 (Y軸)
-        rightFingerValues[1] = GetFingerBendAxis(rightThumbProximal, 2);  // F2: 拇指彎曲 (Z軸)
+        // 拇指：使用專用角度設定
+        rightFingerValues[0] = GetThumbBend(rightThumbProximal, 1, thumbRotateOpen, thumbRotateClose);  // F1: 拇指旋轉 (Y軸)
+        rightFingerValues[1] = GetThumbBend(rightThumbProximal, 2, thumbBendOpen, thumbBendClose);      // F2: 拇指彎曲 (Z軸)
         
-        // 其他手指：用 Z 軸
+        // 其他手指：用 Z 軸和一般設定
         rightFingerValues[2] = GetFingerBend(rightIndexProximal);  // F3: 食指
         rightFingerValues[3] = GetFingerBend(rightMiddleProximal); // F4: 中指
         rightFingerValues[4] = GetFingerBend(rightRingProximal);   // F5: 無名指
@@ -232,9 +245,9 @@ public class EHandFingerReader : MonoBehaviour
     }
     
     /// <summary>
-    /// 計算手指彎曲程度（指定軸向）
+    /// 計算拇指彎曲程度（使用專用角度設定）
     /// </summary>
-    private float GetFingerBendAxis(Transform fingerBone, int axis)
+    private float GetThumbBend(Transform fingerBone, int axis, float open, float close)
     {
         if (fingerBone == null) return 0f;
 
@@ -243,7 +256,7 @@ public class EHandFingerReader : MonoBehaviour
         
         if (angle > 180f) angle -= 360f;
 
-        float bend = Mathf.InverseLerp(openAngle, closeAngle, angle);
+        float bend = Mathf.InverseLerp(open, close, angle);
         return Mathf.Clamp01(bend);
     }
 
