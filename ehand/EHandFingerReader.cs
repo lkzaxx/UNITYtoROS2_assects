@@ -212,20 +212,31 @@ public class EHandFingerReader : MonoBehaviour
     [Range(0f, 1f)]
     public float forceTestValue = 1.0f;
 
+    [Header("=== 平滑設定 ===")]
+    [Tooltip("平滑係數 (0~1)，越小越平滑但延遲越高")]
+    public float smoothness = 0.5f;
+    
+    private float[] targetLeftFingerValues = new float[6];
+    private float[] targetRightFingerValues = new float[6];
+
     /// <summary>
     /// 讀取左手手指角度
     /// </summary>
     private void ReadLeftFingers()
     {
-        // 拇指：使用專用角度設定
-        leftFingerValues[0] = GetThumbBend(leftThumbProximal, 1, thumbRotateOpen, thumbRotateClose);  // F1: 拇指旋轉 (Y軸)
-        leftFingerValues[1] = GetThumbBend(leftThumbProximal, 2, thumbBendOpen, thumbBendClose);      // F2: 拇指彎曲 (Z軸)
+        // 讀取目標值
+        targetLeftFingerValues[0] = GetThumbBend(leftThumbProximal, 1, thumbRotateOpen, thumbRotateClose);
+        targetLeftFingerValues[1] = GetThumbBend(leftThumbProximal, 2, thumbBendOpen, thumbBendClose);
+        targetLeftFingerValues[2] = GetFingerBend(leftIndexProximal);
+        targetLeftFingerValues[3] = GetFingerBend(leftMiddleProximal);
+        targetLeftFingerValues[4] = GetFingerBend(leftRingProximal);
+        targetLeftFingerValues[5] = GetFingerBend(leftLittleProximal);
         
-        // 其他手指：用 Z 軸和一般設定
-        leftFingerValues[2] = GetFingerBend(leftIndexProximal);  // F3: 食指
-        leftFingerValues[3] = GetFingerBend(leftMiddleProximal); // F4: 中指
-        leftFingerValues[4] = GetFingerBend(leftRingProximal);   // F5: 無名指
-        leftFingerValues[5] = GetFingerBend(leftLittleProximal); // F6: 尾指
+        // 平滑插值
+        for (int i = 0; i < 6; i++)
+        {
+            leftFingerValues[i] = Mathf.Lerp(leftFingerValues[i], targetLeftFingerValues[i], 1f - smoothness);
+        }
     }
 
     /// <summary>
@@ -233,15 +244,19 @@ public class EHandFingerReader : MonoBehaviour
     /// </summary>
     private void ReadRightFingers()
     {
-        // 拇指：使用專用角度設定
-        rightFingerValues[0] = GetThumbBend(rightThumbProximal, 1, thumbRotateOpen, thumbRotateClose);  // F1: 拇指旋轉 (Y軸)
-        rightFingerValues[1] = GetThumbBend(rightThumbProximal, 2, thumbBendOpen, thumbBendClose);      // F2: 拇指彎曲 (Z軸)
+        // 讀取目標值
+        targetRightFingerValues[0] = GetThumbBend(rightThumbProximal, 1, thumbRotateOpen, thumbRotateClose);
+        targetRightFingerValues[1] = GetThumbBend(rightThumbProximal, 2, thumbBendOpen, thumbBendClose);
+        targetRightFingerValues[2] = GetFingerBend(rightIndexProximal);
+        targetRightFingerValues[3] = GetFingerBend(rightMiddleProximal);
+        targetRightFingerValues[4] = GetFingerBend(rightRingProximal);
+        targetRightFingerValues[5] = GetFingerBend(rightLittleProximal);
         
-        // 其他手指：用 Z 軸和一般設定
-        rightFingerValues[2] = GetFingerBend(rightIndexProximal);  // F3: 食指
-        rightFingerValues[3] = GetFingerBend(rightMiddleProximal); // F4: 中指
-        rightFingerValues[4] = GetFingerBend(rightRingProximal);   // F5: 無名指
-        rightFingerValues[5] = GetFingerBend(rightLittleProximal); // F6: 尾指
+        // 平滑插值
+        for (int i = 0; i < 6; i++)
+        {
+            rightFingerValues[i] = Mathf.Lerp(rightFingerValues[i], targetRightFingerValues[i], 1f - smoothness);
+        }
     }
     
     /// <summary>
