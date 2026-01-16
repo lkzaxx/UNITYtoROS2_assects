@@ -257,16 +257,30 @@ public class EHandFingerReader : MonoBehaviour
     void LateUpdate()
     {
         // 除錯：每秒輸出一次角度資訊
-        if (debugMode && leftIndexProximal != null)
+        if (debugMode)
         {
             debugTimer += Time.deltaTime;
             if (debugTimer >= 1.0f)
             {
                 debugTimer = 0f;
-                Vector3 euler = leftIndexProximal.localEulerAngles;
-                float rawZ = euler.z;
-                float convertedZ = rawZ > 180f ? rawZ - 360f : rawZ;
-                Debug.Log($"[EHandFingerReader DEBUG] Z_raw={rawZ:F1}, Z_converted={convertedZ:F1}, open={openAngle}, close={closeAngle}, output={leftFingerValues[2]:F2}");
+                
+                // 食指 Debug
+                if (leftIndexProximal != null)
+                {
+                    Vector3 euler = leftIndexProximal.localEulerAngles;
+                    float convertedZ = euler.z > 180f ? euler.z - 360f : euler.z;
+                    Debug.Log($"[DEBUG Index] Z={convertedZ:F1}, output={leftFingerValues[2]:F2}");
+                }
+                
+                // 拇指末端 Debug (F2)
+                if (leftThumbDistal != null)
+                {
+                    Vector3 euler = leftThumbDistal.localEulerAngles;
+                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
+                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
+                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
+                    Debug.Log($"[DEBUG ThumbDistal] X={x:F1}, Y={y:F1}, Z={z:F1}, output={leftFingerValues[1]:F2}");
+                }
             }
         }
     }
