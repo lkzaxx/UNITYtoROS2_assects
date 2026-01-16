@@ -246,7 +246,9 @@ public class EHandFingerReader : MonoBehaviour
             {
                 debugTimer = 0f;
                 Vector3 euler = leftIndexProximal.localEulerAngles;
-                Debug.Log($"[EHandFingerReader DEBUG] LeftIndex localEuler=({euler.x:F1}, {euler.y:F1}, {euler.z:F1}), output={leftFingerValues[2]:F2}");
+                float rawZ = euler.z;
+                float convertedZ = rawZ > 180f ? rawZ - 360f : rawZ;
+                Debug.Log($"[EHandFingerReader DEBUG] Z_raw={rawZ:F1}, Z_converted={convertedZ:F1}, open={openAngle}, close={closeAngle}, output={leftFingerValues[2]:F2}");
             }
         }
     }
