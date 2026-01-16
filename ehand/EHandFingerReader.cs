@@ -207,6 +207,16 @@ public class EHandFingerReader : MonoBehaviour
         rightFingerValues[5] = GetFingerBend(rightLittleProximal); // F6: 尾指
     }
 
+    [Header("=== 除錯 ===")]
+    [Tooltip("顯示原始角度值")]
+    public bool debugMode = false;
+    
+    [Tooltip("使用的旋轉軸 (0=X, 1=Y, 2=Z)")]
+    [Range(0, 2)]
+    public int bendAxis = 0;
+    
+    private float debugTimer = 0f;
+
     /// <summary>
     /// 計算手指彎曲程度 (0=張開, 1=握緊)
     /// </summary>
@@ -214,9 +224,9 @@ public class EHandFingerReader : MonoBehaviour
     {
         if (fingerBone == null) return 0f;
 
-        // 取得 local rotation 的 X 軸角度（手指彎曲方向）
-        // 注意：不同骨骼可能需要調整軸向
-        float angle = fingerBone.localEulerAngles.x;
+        // 取得 local rotation 的角度（根據設定的軸向）
+        Vector3 euler = fingerBone.localEulerAngles;
+        float angle = bendAxis == 0 ? euler.x : (bendAxis == 1 ? euler.y : euler.z);
         
         // 將 Unity 角度 (0~360) 轉換為 -180~180
         if (angle > 180f) angle -= 360f;
@@ -224,6 +234,21 @@ public class EHandFingerReader : MonoBehaviour
         // 映射到 0~1
         float bend = Mathf.InverseLerp(openAngle, closeAngle, angle);
         return Mathf.Clamp01(bend);
+    }
+    
+    void LateUpdate()
+    {
+        // 除錯：每秒輸出一次角度資訊
+        if (debugMode && leftIndexProximal != null)
+        {
+            debugTimer += Time.deltaTime;
+            if (debugTimer >= 1.0f)
+            {
+                debugTimer = 0f;
+                Vector3 euler = leftIndexProximal.localEulerAngles;
+                Debug.Log($"[EHandFingerReader DEBUG] LeftIndex localEuler=({euler.x:F1}, {euler.y:F1}, {euler.z:F1}), output={leftFingerValues[2]:F2}");
+            }
+        }
     }
 
     /// <summary>
