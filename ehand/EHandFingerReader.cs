@@ -281,6 +281,16 @@ public class EHandFingerReader : MonoBehaviour
                     float z = euler.z > 180f ? euler.z - 360f : euler.z;
                     Debug.Log($"[DEBUG ThumbDistal] X={x:F1}, Y={y:F1}, Z={z:F1}, output={leftFingerValues[1]:F2}");
                 }
+                
+                // 拇指近端 Debug (F1)
+                if (leftThumbProximal != null)
+                {
+                    Vector3 euler = leftThumbProximal.localEulerAngles;
+                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
+                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
+                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
+                    Debug.Log($"[DEBUG ThumbProximal] X={x:F1}, Y={y:F1}, Z={z:F1}, output={leftFingerValues[0]:F2}");
+                }
             }
         }
     }
