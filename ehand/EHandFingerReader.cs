@@ -314,33 +314,70 @@ public class EHandFingerReader : MonoBehaviour
             {
                 debugTimer = 0f;
                 
-                // 食指 Debug
-                if (leftIndexProximal != null)
-                {
-                    Vector3 euler = leftIndexProximal.localEulerAngles;
-                    float convertedZ = euler.z > 180f ? euler.z - 360f : euler.z;
-                    Debug.Log($"[DEBUG Index] Z={convertedZ:F1}, output={leftFingerValues[2]:F2}");
-                }
+                string axisName = bendAxis == 0 ? "X" : (bendAxis == 1 ? "Y" : "Z");
+                Debug.Log($"=== 左手手指角度 [計算軸: {axisName}] ===");
                 
-                // 拇指末端 Debug (F2)
-                if (leftThumbDistal != null)
-                {
-                    Vector3 euler = leftThumbDistal.localEulerAngles;
-                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
-                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
-                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
-                    Debug.Log($"[DEBUG ThumbDistal] X={x:F1}, Y={y:F1}, Z={z:F1}, output={leftFingerValues[1]:F2}");
-                }
-                
-                // 拇指近端 Debug (F1)
+                // 拇指近端 Debug (F1 - 旋轉)
                 if (leftThumbProximal != null)
                 {
                     Vector3 euler = leftThumbProximal.localEulerAngles;
                     float x = euler.x > 180f ? euler.x - 360f : euler.x;
                     float y = euler.y > 180f ? euler.y - 360f : euler.y;
                     float z = euler.z > 180f ? euler.z - 360f : euler.z;
-                    Debug.Log($"[DEBUG ThumbProximal] X={x:F1}, Y={y:F1}, Z={z:F1}, output={leftFingerValues[0]:F2}");
+                    Debug.Log($"[F1 拇指旋轉] X={x:F1}, Y={y:F1}, Z={z:F1} → output={leftFingerValues[0]:F2}");
                 }
+                
+                // 拇指末端 Debug (F2 - 伸縮)
+                if (leftThumbProximal != null)
+                {
+                    Vector3 euler = leftThumbProximal.localEulerAngles;
+                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
+                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
+                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
+                    Debug.Log($"[F2 拇指伸縮] X={x:F1}, Y={y:F1}, Z={z:F1} → output={leftFingerValues[1]:F2}");
+                }
+                
+                // 食指 Debug (F3)
+                if (leftIndexProximal != null)
+                {
+                    Vector3 euler = leftIndexProximal.localEulerAngles;
+                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
+                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
+                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
+                    Debug.Log($"[F3 食指] X={x:F1}, Y={y:F1}, Z={z:F1} → output={leftFingerValues[2]:F2}");
+                }
+                
+                // 中指 Debug (F4)
+                if (leftMiddleProximal != null)
+                {
+                    Vector3 euler = leftMiddleProximal.localEulerAngles;
+                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
+                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
+                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
+                    Debug.Log($"[F4 中指] X={x:F1}, Y={y:F1}, Z={z:F1} → output={leftFingerValues[3]:F2}");
+                }
+                
+                // 無名指 Debug (F5)
+                if (leftRingProximal != null)
+                {
+                    Vector3 euler = leftRingProximal.localEulerAngles;
+                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
+                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
+                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
+                    Debug.Log($"[F5 無名指] X={x:F1}, Y={y:F1}, Z={z:F1} → output={leftFingerValues[4]:F2}");
+                }
+                
+                // 尾指 Debug (F6)
+                if (leftLittleProximal != null)
+                {
+                    Vector3 euler = leftLittleProximal.localEulerAngles;
+                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
+                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
+                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
+                    Debug.Log($"[F6 尾指] X={x:F1}, Y={y:F1}, Z={z:F1} → output={leftFingerValues[5]:F2}");
+                }
+                
+                Debug.Log("==================");
             }
         }
     }
