@@ -307,19 +307,22 @@ public class EHandFingerReader : MonoBehaviour
 
     /// <summary>
     /// 計算手指彎曲程度 (0=張開, 1=握緊)
-    /// 使用手指相對於手掌的夾角，不受手腕旋轉影響
+    /// 使用 localRotation（相對於父骨骼的旋轉），不受手腕世界旋轉影響
+    /// 參考：Unity XR Hands curl 計算標準
     /// </summary>
     private float GetFingerBend(Transform fingerBone, float openAngle, float closeAngle)
     {
-        if (fingerBone == null || leftHandWrist == null) return 0f;
+        if (fingerBone == null) return 0f;
 
-        // 使用相對於手掌的夾角計算（不受手腕旋轉影響）
-        // 計算手指 forward 向量與手掌 forward 向量的夾角
-        float angle = Vector3.SignedAngle(
-            leftHandWrist.forward,    // 手掌朝前方向
-            fingerBone.forward,       // 手指朝前方向
-            leftHandWrist.right       // 旋轉軸：手掌右方向（從拇指指向小指）
-        );
+        // 使用 localRotation（相對於父骨骼的旋轉）
+        // 這在 Meta Movement SDK 中是標準做法
+        Vector3 localEuler = fingerBone.localRotation.eulerAngles;
+        
+        // 提取 Z 軸角度（手指彎曲軸）
+        float angle = localEuler.z;
+        
+        // 轉換為 -180~180 範圍
+        if (angle > 180f) angle -= 360f;
 
         // 映射到 0~1
         float bend = Mathf.InverseLerp(openAngle, closeAngle, angle);
@@ -336,7 +339,7 @@ public class EHandFingerReader : MonoBehaviour
             {
                 debugTimer = 0f;
                 
-                Debug.Log("=== 左手手指角度 [相對手掌夾角] ===");
+                Debug.Log("=== 左手手指角度 [localRotation Z軸] ===");
                 
                 // 拇指近端 Debug (F1 - 旋轉)
                 if (leftThumbProximal != null && leftHandWrist != null)
@@ -357,31 +360,31 @@ public class EHandFingerReader : MonoBehaviour
                 }
                 
                 // 食指 Debug (F3)
-                if (leftIndexProximal != null && leftHandWrist != null)
+                if (leftIndexProximal != null)
                 {
                     float angle = GetCurrentAngle(leftIndexProximal);
-                    Debug.Log($"[F3 食指] 相對手掌={angle:F1}° → output={leftFingerValues[2]:F2}");
+                    Debug.Log($"[F3 食指] localZ={angle:F1}° → output={leftFingerValues[2]:F2}");
                 }
                 
                 // 中指 Debug (F4)
-                if (leftMiddleProximal != null && leftHandWrist != null)
+                if (leftMiddleProximal != null)
                 {
                     float angle = GetCurrentAngle(leftMiddleProximal);
-                    Debug.Log($"[F4 中指] 相對手掌={angle:F1}° → output={leftFingerValues[3]:F2}");
+                    Debug.Log($"[F4 中指] localZ={angle:F1}° → output={leftFingerValues[3]:F2}");
                 }
                 
                 // 無名指 Debug (F5)
-                if (leftRingProximal != null && leftHandWrist != null)
+                if (leftRingProximal != null)
                 {
                     float angle = GetCurrentAngle(leftRingProximal);
-                    Debug.Log($"[F5 無名指] 相對手掌={angle:F1}° → output={leftFingerValues[4]:F2}");
+                    Debug.Log($"[F5 無名指] localZ={angle:F1}° → output={leftFingerValues[4]:F2}");
                 }
                 
                 // 尾指 Debug (F6)
-                if (leftLittleProximal != null && leftHandWrist != null)
+                if (leftLittleProximal != null)
                 {
                     float angle = GetCurrentAngle(leftLittleProximal);
-                    Debug.Log($"[F6 尾指] 相對手掌={angle:F1}° → output={leftFingerValues[5]:F2}");
+                    Debug.Log($"[F6 尾指] localZ={angle:F1}° → output={leftFingerValues[5]:F2}");
                 }
                 
                 Debug.Log("==================");
@@ -589,18 +592,19 @@ public class EHandFingerReader : MonoBehaviour
     }
 
     /// <summary>
-    /// 取得指定骨骼當前相對於手掌的夾角（-180~180）
+    /// 取得指定骨骼當前的 Z 軸角度（-180~180）
+    /// 使用 localRotation（相對於父骨骼）
     /// </summary>
     private float GetCurrentAngle(Transform bone)
     {
-        if (bone == null || leftHandWrist == null) return 0f;
+        if (bone == null) return 0f;
         
-        // 使用與 GetFingerBend() 相同的夾角計算
-        float angle = Vector3.SignedAngle(
-            leftHandWrist.forward,
-            bone.forward,
-            leftHandWrist.right
-        );
+        // 使用 localRotation（相對於父骨骼的旋轉）
+        Vector3 localEuler = bone.localRotation.eulerAngles;
+        float angle = localEuler.z;
+        
+        // 轉換為 -180~180
+        if (angle > 180f) angle -= 360f;
         
         return angle;
     }
