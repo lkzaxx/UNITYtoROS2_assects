@@ -34,23 +34,59 @@ public class EHandFingerReader : MonoBehaviour
     [Tooltip("使用直接 Transform 參考（Meta Movement SDK 專用）")]
     public bool useDirectTransforms = false;
 
-    [Header("=== 左手手指 Transform（直接參考模式）===")]
-    public Transform leftHandWrist;  // 手掌根骨骼（用於計算相對角度）
+    [Header("=== 左手手指 Transform（多關節模式）===")]
+    public Transform leftHandWrist;  // 手掌根骨骼
+    
+    // 拇指（雙關節，使用 Y/Z 軸）
     public Transform leftThumbProximal;
     public Transform leftThumbDistal;
+    
+    // 食指（三關節）
     public Transform leftIndexProximal;
+    public Transform leftIndexIntermediate;  // 🆕 中段關節
+    public Transform leftIndexDistal;        // 🆕 末端關節
+    
+    // 中指（三關節）
     public Transform leftMiddleProximal;
+    public Transform leftMiddleIntermediate; // 🆕 中段關節
+    public Transform leftMiddleDistal;       // 🆕 末端關節
+    
+    // 無名指（三關節）
     public Transform leftRingProximal;
+    public Transform leftRingIntermediate;   // 🆕 中段關節
+    public Transform leftRingDistal;         // 🆕 末端關節
+    
+    // 尾指（三關節）
     public Transform leftLittleProximal;
+    public Transform leftLittleIntermediate; // 🆕 中段關節
+    public Transform leftLittleDistal;       // 🆕 末端關節
 
-    [Header("=== 右手手指 Transform（直接參考模式）===")]
-    public Transform rightHandWrist;  // 手掌根骨骼（用於計算相對角度）
+    [Header("=== 右手手指 Transform（多關節模式）===")]
+    public Transform rightHandWrist;  // 手掌根骨骼
+    
+    // 拇指（雙關節，使用 Y/Z 軸）
     public Transform rightThumbProximal;
     public Transform rightThumbDistal;
+    
+    // 食指（三關節）
     public Transform rightIndexProximal;
+    public Transform rightIndexIntermediate;  // 🆕 中段關節
+    public Transform rightIndexDistal;        // 🆕 末端關節
+    
+    // 中指（三關節）
     public Transform rightMiddleProximal;
+    public Transform rightMiddleIntermediate; // 🆕 中段關節
+    public Transform rightMiddleDistal;       // 🆕 末端關節
+    
+    // 無名指（三關節）
     public Transform rightRingProximal;
+    public Transform rightRingIntermediate;   // 🆕 中段關節
+    public Transform rightRingDistal;         // 🆕 末端關節
+    
+    // 尾指（三關節）
     public Transform rightLittleProximal;
+    public Transform rightLittleIntermediate; // 🆕 中段關節
+    public Transform rightLittleDistal;       // 🆕 末端關節
 
     [Header("=== Topic 設定 ===")]
     [Tooltip("手指命令 Topic")]
@@ -244,13 +280,23 @@ public class EHandFingerReader : MonoBehaviour
     /// </summary>
     private void ReadLeftFingers()
     {
-        // 讀取目標值（每根手指使用專屬角度範圍）
+        // 讀取目標值（拇指使用專屬函數，四指使用三關節累加）
         targetLeftFingerValues[0] = GetThumbBend(leftThumbProximal, 1, thumbRotateOpen, thumbRotateClose);
         targetLeftFingerValues[1] = GetThumbBend(leftThumbProximal, 2, thumbBendOpen, thumbBendClose);
-        targetLeftFingerValues[2] = GetFingerBend(leftIndexProximal, indexOpenAngle, indexCloseAngle);
-        targetLeftFingerValues[3] = GetFingerBend(leftMiddleProximal, middleOpenAngle, middleCloseAngle);
-        targetLeftFingerValues[4] = GetFingerBend(leftRingProximal, ringOpenAngle, ringCloseAngle);
-        targetLeftFingerValues[5] = GetFingerBend(leftLittleProximal, littleOpenAngle, littleCloseAngle);
+        
+        // 四指（三關節累加）
+        targetLeftFingerValues[2] = GetFingerBend(
+            leftIndexProximal, leftIndexIntermediate, leftIndexDistal,
+            indexOpenAngle, indexCloseAngle);
+        targetLeftFingerValues[3] = GetFingerBend(
+            leftMiddleProximal, leftMiddleIntermediate, leftMiddleDistal,
+            middleOpenAngle, middleCloseAngle);
+        targetLeftFingerValues[4] = GetFingerBend(
+            leftRingProximal, leftRingIntermediate, leftRingDistal,
+            ringOpenAngle, ringCloseAngle);
+        targetLeftFingerValues[5] = GetFingerBend(
+            leftLittleProximal, leftLittleIntermediate, leftLittleDistal,
+            littleOpenAngle, littleCloseAngle);
         
         // 平滑插值
         for (int i = 0; i < 6; i++)
@@ -264,13 +310,23 @@ public class EHandFingerReader : MonoBehaviour
     /// </summary>
     private void ReadRightFingers()
     {
-        // 讀取目標值（每根手指使用專屬角度範圍）
+        // 讀取目標值（拇指使用專屬函數，四指使用三關節累加）
         targetRightFingerValues[0] = GetThumbBend(rightThumbProximal, 1, thumbRotateOpen, thumbRotateClose);
         targetRightFingerValues[1] = GetThumbBend(rightThumbProximal, 2, thumbBendOpen, thumbBendClose);
-        targetRightFingerValues[2] = GetFingerBend(rightIndexProximal, indexOpenAngle, indexCloseAngle);
-        targetRightFingerValues[3] = GetFingerBend(rightMiddleProximal, middleOpenAngle, middleCloseAngle);
-        targetRightFingerValues[4] = GetFingerBend(rightRingProximal, ringOpenAngle, ringCloseAngle);
-        targetRightFingerValues[5] = GetFingerBend(rightLittleProximal, littleOpenAngle, littleCloseAngle);
+        
+        // 四指（三關節累加）
+        targetRightFingerValues[2] = GetFingerBend(
+            rightIndexProximal, rightIndexIntermediate, rightIndexDistal,
+            indexOpenAngle, indexCloseAngle);
+        targetRightFingerValues[3] = GetFingerBend(
+            rightMiddleProximal, rightMiddleIntermediate, rightMiddleDistal,
+            middleOpenAngle, middleCloseAngle);
+        targetRightFingerValues[4] = GetFingerBend(
+            rightRingProximal, rightRingIntermediate, rightRingDistal,
+            ringOpenAngle, ringCloseAngle);
+        targetRightFingerValues[5] = GetFingerBend(
+            rightLittleProximal, rightLittleIntermediate, rightLittleDistal,
+            littleOpenAngle, littleCloseAngle);
         
         // 平滑插值
         for (int i = 0; i < 6; i++)
@@ -278,6 +334,7 @@ public class EHandFingerReader : MonoBehaviour
             rightFingerValues[i] = Mathf.Lerp(rightFingerValues[i], targetRightFingerValues[i], 1f - smoothness);
         }
     }
+    
     
     /// <summary>
     /// 計算拇指彎曲程度（使用專用角度設定）
@@ -307,26 +364,39 @@ public class EHandFingerReader : MonoBehaviour
 
     /// <summary>
     /// 計算手指彎曲程度 (0=張開, 1=握緊)
-    /// 使用 localRotation（相對於父骨骼的旋轉），不受手腕世界旋轉影響
-    /// 參考：Unity XR Hands curl 計算標準
+    /// 使用三關節累加（Proximal + Intermediate + Distal）
+    /// 符合 Unity XR Hands 標準做法
     /// </summary>
-    private float GetFingerBend(Transform fingerBone, float openAngle, float closeAngle)
+    private float GetFingerBend(
+        Transform proximal,
+        Transform intermediate,
+        Transform distal,
+        float openAngle,
+        float closeAngle)
     {
-        if (fingerBone == null) return 0f;
+        if (proximal == null || intermediate == null || distal == null)
+            return 0f;
 
-        // 使用 localRotation（相對於父骨骼的旋轉）
-        // 這在 Meta Movement SDK 中是標準做法
-        Vector3 localEuler = fingerBone.localRotation.eulerAngles;
-        
-        // 提取 Z 軸角度（手指彎曲軸）
-        float angle = localEuler.z;
-        
-        // 轉換為 -180~180 範圍
-        if (angle > 180f) angle -= 360f;
+        // 累加三個關節的 Z 軸角度
+        float totalAngle = GetJointAngle(proximal)
+                         + GetJointAngle(intermediate)
+                         + GetJointAngle(distal);
 
         // 映射到 0~1
-        float bend = Mathf.InverseLerp(openAngle, closeAngle, angle);
+        float bend = Mathf.InverseLerp(openAngle, closeAngle, totalAngle);
         return Mathf.Clamp01(bend);
+    }
+
+    /// <summary>
+    /// 取得單一關節的 Z 軸角度（-180~180）
+    /// </summary>
+    private float GetJointAngle(Transform joint)
+    {
+        if (joint == null) return 0f;
+        
+        float angle = joint.localRotation.eulerAngles.z;
+        if (angle > 180f) angle -= 360f;
+        return angle;
     }
     
     void LateUpdate()
@@ -359,32 +429,44 @@ public class EHandFingerReader : MonoBehaviour
                     Debug.Log($"[F2 拇指伸縮] Y={thumbY:F1}° (localY), Z={thumbZ:F1}° (localZ) → output={leftFingerValues[1]:F2}");
                 }
                 
-                // 食指 Debug (F3)
+                // 食指 Debug (F3) - 三關節累加
                 if (leftIndexProximal != null)
                 {
-                    float angle = GetCurrentAngle(leftIndexProximal);
-                    Debug.Log($"[F3 食指] localZ={angle:F1}° → output={leftFingerValues[2]:F2}");
+                    float total = GetCurrentAngle(
+                        leftIndexProximal, 
+                        leftIndexIntermediate, 
+                        leftIndexDistal);
+                    Debug.Log($"[F3 食指] 總角度={total:F1}° → output={leftFingerValues[2]:F2}");
                 }
                 
-                // 中指 Debug (F4)
+                // 中指 Debug (F4) - 三關節累加
                 if (leftMiddleProximal != null)
                 {
-                    float angle = GetCurrentAngle(leftMiddleProximal);
-                    Debug.Log($"[F4 中指] localZ={angle:F1}° → output={leftFingerValues[3]:F2}");
+                    float total = GetCurrentAngle(
+                        leftMiddleProximal, 
+                        leftMiddleIntermediate, 
+                        leftMiddleDistal);
+                    Debug.Log($"[F4 中指] 總角度={total:F1}° → output={leftFingerValues[3]:F2}");
                 }
                 
-                // 無名指 Debug (F5)
+                // 無名指 Debug (F5) - 三關節累加
                 if (leftRingProximal != null)
                 {
-                    float angle = GetCurrentAngle(leftRingProximal);
-                    Debug.Log($"[F5 無名指] localZ={angle:F1}° → output={leftFingerValues[4]:F2}");
+                    float total = GetCurrentAngle(
+                        leftRingProximal, 
+                        leftRingIntermediate, 
+                        leftRingDistal);
+                    Debug.Log($"[F5 無名指] 總角度={total:F1}° → output={leftFingerValues[4]:F2}");
                 }
                 
-                // 尾指 Debug (F6)
+                // 尾指 Debug (F6) - 三關節累加
                 if (leftLittleProximal != null)
                 {
-                    float angle = GetCurrentAngle(leftLittleProximal);
-                    Debug.Log($"[F6 尾指] localZ={angle:F1}° → output={leftFingerValues[5]:F2}");
+                    float total = GetCurrentAngle(
+                        leftLittleProximal, 
+                        leftLittleIntermediate, 
+                        leftLittleDistal);
+                    Debug.Log($"[F6 尾指] 總角度={total:F1}° → output={leftFingerValues[5]:F2}");
                 }
                 
                 Debug.Log("==================");
@@ -495,11 +577,11 @@ public class EHandFingerReader : MonoBehaviour
 
         Debug.Log("=== 開始校準「張開」極值 ===");
 
-        // 讀取當前角度
-        float indexZ = GetCurrentAngle(leftIndexProximal);
-        float middleZ = GetCurrentAngle(leftMiddleProximal);
-        float ringZ = GetCurrentAngle(leftRingProximal);
-        float littleZ = GetCurrentAngle(leftLittleProximal);
+        // 讀取當前角度（三關節累加）
+        float indexZ = GetCurrentAngle(leftIndexProximal, leftIndexIntermediate, leftIndexDistal);
+        float middleZ = GetCurrentAngle(leftMiddleProximal, leftMiddleIntermediate, leftMiddleDistal);
+        float ringZ = GetCurrentAngle(leftRingProximal, leftRingIntermediate, leftRingDistal);
+        float littleZ = GetCurrentAngle(leftLittleProximal, leftLittleIntermediate, leftLittleDistal);
         
         Vector3 thumbEuler = leftThumbProximal.localEulerAngles;
         float thumbY = thumbEuler.y > 180f ? thumbEuler.y - 360f : thumbEuler.y;
@@ -538,11 +620,11 @@ public class EHandFingerReader : MonoBehaviour
 
         Debug.Log("=== 開始校準「握緊」極值 ===");
 
-        // 讀取當前角度
-        float indexZ = GetCurrentAngle(leftIndexProximal);
-        float middleZ = GetCurrentAngle(leftMiddleProximal);
-        float ringZ = GetCurrentAngle(leftRingProximal);
-        float littleZ = GetCurrentAngle(leftLittleProximal);
+        // 讀取當前角度（三關節累加）
+        float indexZ = GetCurrentAngle(leftIndexProximal, leftIndexIntermediate, leftIndexDistal);
+        float middleZ = GetCurrentAngle(leftMiddleProximal, leftMiddleIntermediate, leftMiddleDistal);
+        float ringZ = GetCurrentAngle(leftRingProximal, leftRingIntermediate, leftRingDistal);
+        float littleZ = GetCurrentAngle(leftLittleProximal, leftLittleIntermediate, leftLittleDistal);
         
         Vector3 thumbEuler = leftThumbProximal.localEulerAngles;
         float thumbY = thumbEuler.y > 180f ? thumbEuler.y - 360f : thumbEuler.y;
@@ -578,11 +660,11 @@ public class EHandFingerReader : MonoBehaviour
             return;
         }
 
-        Debug.Log("=== 當前手指角度 ===");
-        Debug.Log($"[食指] Z = {GetCurrentAngle(leftIndexProximal):F1}°");
-        Debug.Log($"[中指] Z = {GetCurrentAngle(leftMiddleProximal):F1}°");
-        Debug.Log($"[無名指] Z = {GetCurrentAngle(leftRingProximal):F1}°");
-        Debug.Log($"[尾指] Z = {GetCurrentAngle(leftLittleProximal):F1}°");
+        Debug.Log("=== 當前手指角度（三關節累加）===");
+        Debug.Log($"[食指] 總角度 = {GetCurrentAngle(leftIndexProximal, leftIndexIntermediate, leftIndexDistal):F1}°");
+        Debug.Log($"[中指] 總角度 = {GetCurrentAngle(leftMiddleProximal, leftMiddleIntermediate, leftMiddleDistal):F1}°");
+        Debug.Log($"[無名指] 總角度 = {GetCurrentAngle(leftRingProximal, leftRingIntermediate, leftRingDistal):F1}°");
+        Debug.Log($"[尾指] 總角度 = {GetCurrentAngle(leftLittleProximal, leftLittleIntermediate, leftLittleDistal):F1}°");
         
         Vector3 thumbEuler = leftThumbProximal.localEulerAngles;
         float thumbY = thumbEuler.y > 180f ? thumbEuler.y - 360f : thumbEuler.y;
@@ -592,21 +674,14 @@ public class EHandFingerReader : MonoBehaviour
     }
 
     /// <summary>
-    /// 取得指定骨骼當前的 Z 軸角度（-180~180）
-    /// 使用 localRotation（相對於父骨骼）
+    /// 取得指定手指當前的總角度（三關節累加，-180~180）
     /// </summary>
-    private float GetCurrentAngle(Transform bone)
+    private float GetCurrentAngle(Transform proximal, Transform intermediate, Transform distal)
     {
-        if (bone == null) return 0f;
+        if (proximal == null || intermediate == null || distal == null)
+            return 0f;
         
-        // 使用 localRotation（相對於父骨骼的旋轉）
-        Vector3 localEuler = bone.localRotation.eulerAngles;
-        float angle = localEuler.z;
-        
-        // 轉換為 -180~180
-        if (angle > 180f) angle -= 360f;
-        
-        return angle;
+        return GetJointAngle(proximal) + GetJointAngle(intermediate) + GetJointAngle(distal);
     }
 
     /// <summary>
