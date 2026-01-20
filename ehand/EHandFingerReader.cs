@@ -35,6 +35,7 @@ public class EHandFingerReader : MonoBehaviour
     public bool useDirectTransforms = false;
 
     [Header("=== 左手手指 Transform（直接參考模式）===")]
+    public Transform leftHandWrist;  // 手掌根骨骼（用於計算相對角度）
     public Transform leftThumbProximal;
     public Transform leftThumbDistal;
     public Transform leftIndexProximal;
@@ -43,6 +44,7 @@ public class EHandFingerReader : MonoBehaviour
     public Transform leftLittleProximal;
 
     [Header("=== 右手手指 Transform（直接參考模式）===")]
+    public Transform rightHandWrist;  // 手掌根骨骼（用於計算相對角度）
     public Transform rightThumbProximal;
     public Transform rightThumbDistal;
     public Transform rightIndexProximal;
@@ -305,17 +307,19 @@ public class EHandFingerReader : MonoBehaviour
 
     /// <summary>
     /// 計算手指彎曲程度 (0=張開, 1=握緊)
+    /// 使用手指相對於手掌的夾角，不受手腕旋轉影響
     /// </summary>
     private float GetFingerBend(Transform fingerBone, float openAngle, float closeAngle)
     {
-        if (fingerBone == null) return 0f;
+        if (fingerBone == null || leftHandWrist == null) return 0f;
 
-        // 取得 local rotation 的角度（根據設定的軸向）
-        Vector3 euler = fingerBone.localEulerAngles;
-        float angle = bendAxis == 0 ? euler.x : (bendAxis == 1 ? euler.y : euler.z);
-        
-        // 將 Unity 角度 (0~360) 轉換為 -180~180
-        if (angle > 180f) angle -= 360f;
+        // 使用相對於手掌的夾角計算（不受手腕旋轉影響）
+        // 計算手指 forward 向量與手掌 forward 向量的夾角
+        float angle = Vector3.SignedAngle(
+            leftHandWrist.forward,    // 手掌朝前方向
+            fingerBone.forward,       // 手指朝前方向
+            leftHandWrist.right       // 旋轉軸：手掌右方向（從拇指指向小指）
+        );
 
         // 映射到 0~1
         float bend = Mathf.InverseLerp(openAngle, closeAngle, angle);
@@ -332,67 +336,52 @@ public class EHandFingerReader : MonoBehaviour
             {
                 debugTimer = 0f;
                 
-                string axisName = bendAxis == 0 ? "X" : (bendAxis == 1 ? "Y" : "Z");
-                Debug.Log($"=== 左手手指角度 [計算軸: {axisName}] ===");
+                Debug.Log("=== 左手手指角度 [相對手掌夾角] ===");
                 
                 // 拇指近端 Debug (F1 - 旋轉)
-                if (leftThumbProximal != null)
+                if (leftThumbProximal != null && leftHandWrist != null)
                 {
-                    Vector3 euler = leftThumbProximal.localEulerAngles;
-                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
-                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
-                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
-                    Debug.Log($"[F1 拇指旋轉] X={x:F1}, Y={y:F1}, Z={z:F1} → output={leftFingerValues[0]:F2}");
+                    Vector3 thumbEuler = leftThumbProximal.localEulerAngles;
+                    float thumbY = thumbEuler.y > 180f ? thumbEuler.y - 360f : thumbEuler.y;
+                    float thumbZ = thumbEuler.z > 180f ? thumbEuler.z - 360f : thumbEuler.z;
+                    Debug.Log($"[F1 拇指旋轉] Y={thumbY:F1}° (localY), Z={thumbZ:F1}° (localZ) → output={leftFingerValues[0]:F2}");
                 }
                 
                 // 拇指末端 Debug (F2 - 伸縮)
-                if (leftThumbProximal != null)
+                if (leftThumbProximal != null && leftHandWrist != null)
                 {
-                    Vector3 euler = leftThumbProximal.localEulerAngles;
-                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
-                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
-                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
-                    Debug.Log($"[F2 拇指伸縮] X={x:F1}, Y={y:F1}, Z={z:F1} → output={leftFingerValues[1]:F2}");
+                    Vector3 thumbEuler = leftThumbProximal.localEulerAngles;
+                    float thumbY = thumbEuler.y > 180f ? thumbEuler.y - 360f : thumbEuler.y;
+                    float thumbZ = thumbEuler.z > 180f ? thumbEuler.z - 360f : thumbEuler.z;
+                    Debug.Log($"[F2 拇指伸縮] Y={thumbY:F1}° (localY), Z={thumbZ:F1}° (localZ) → output={leftFingerValues[1]:F2}");
                 }
                 
                 // 食指 Debug (F3)
-                if (leftIndexProximal != null)
+                if (leftIndexProximal != null && leftHandWrist != null)
                 {
-                    Vector3 euler = leftIndexProximal.localEulerAngles;
-                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
-                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
-                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
-                    Debug.Log($"[F3 食指] X={x:F1}, Y={y:F1}, Z={z:F1} → output={leftFingerValues[2]:F2}");
+                    float angle = GetCurrentAngle(leftIndexProximal);
+                    Debug.Log($"[F3 食指] 相對手掌={angle:F1}° → output={leftFingerValues[2]:F2}");
                 }
                 
                 // 中指 Debug (F4)
-                if (leftMiddleProximal != null)
+                if (leftMiddleProximal != null && leftHandWrist != null)
                 {
-                    Vector3 euler = leftMiddleProximal.localEulerAngles;
-                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
-                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
-                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
-                    Debug.Log($"[F4 中指] X={x:F1}, Y={y:F1}, Z={z:F1} → output={leftFingerValues[3]:F2}");
+                    float angle = GetCurrentAngle(leftMiddleProximal);
+                    Debug.Log($"[F4 中指] 相對手掌={angle:F1}° → output={leftFingerValues[3]:F2}");
                 }
                 
                 // 無名指 Debug (F5)
-                if (leftRingProximal != null)
+                if (leftRingProximal != null && leftHandWrist != null)
                 {
-                    Vector3 euler = leftRingProximal.localEulerAngles;
-                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
-                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
-                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
-                    Debug.Log($"[F5 無名指] X={x:F1}, Y={y:F1}, Z={z:F1} → output={leftFingerValues[4]:F2}");
+                    float angle = GetCurrentAngle(leftRingProximal);
+                    Debug.Log($"[F5 無名指] 相對手掌={angle:F1}° → output={leftFingerValues[4]:F2}");
                 }
                 
                 // 尾指 Debug (F6)
-                if (leftLittleProximal != null)
+                if (leftLittleProximal != null && leftHandWrist != null)
                 {
-                    Vector3 euler = leftLittleProximal.localEulerAngles;
-                    float x = euler.x > 180f ? euler.x - 360f : euler.x;
-                    float y = euler.y > 180f ? euler.y - 360f : euler.y;
-                    float z = euler.z > 180f ? euler.z - 360f : euler.z;
-                    Debug.Log($"[F6 尾指] X={x:F1}, Y={y:F1}, Z={z:F1} → output={leftFingerValues[5]:F2}");
+                    float angle = GetCurrentAngle(leftLittleProximal);
+                    Debug.Log($"[F6 尾指] 相對手掌={angle:F1}° → output={leftFingerValues[5]:F2}");
                 }
                 
                 Debug.Log("==================");
@@ -600,17 +589,18 @@ public class EHandFingerReader : MonoBehaviour
     }
 
     /// <summary>
-    /// 取得指定骨骼當前的 Z 軸角度（-180~180）
+    /// 取得指定骨骼當前相對於手掌的夾角（-180~180）
     /// </summary>
     private float GetCurrentAngle(Transform bone)
     {
-        if (bone == null) return 0f;
+        if (bone == null || leftHandWrist == null) return 0f;
         
-        Vector3 euler = bone.localEulerAngles;
-        float angle = bendAxis == 0 ? euler.x : (bendAxis == 1 ? euler.y : euler.z);
-        
-        // 轉換為 -180~180
-        if (angle > 180f) angle -= 360f;
+        // 使用與 GetFingerBend() 相同的夾角計算
+        float angle = Vector3.SignedAngle(
+            leftHandWrist.forward,
+            bone.forward,
+            leftHandWrist.right
+        );
         
         return angle;
     }
