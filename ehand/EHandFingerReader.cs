@@ -65,25 +65,43 @@ public class EHandFingerReader : MonoBehaviour
     [Tooltip("啟用右手")]
     public bool enableRightHand = true;
 
-    [Header("=== 手指角度映射 ===")]
-    [Tooltip("完全張開時的角度 (度) - 一般手指")]
-    public float openAngle = -5f;
-
-    [Tooltip("完全握緊時的角度 (度) - 一般手指")]
-    public float closeAngle = -52f;
+    [Header("=== 手指角度映射（每根手指獨立設定）===")]
+    [Tooltip("食指張開角度 (度)")]
+    public float indexOpenAngle = -7f;
+    
+    [Tooltip("食指握緊角度 (度)")]
+    public float indexCloseAngle = -58f;
+    
+    [Tooltip("中指張開角度 (度)")]
+    public float middleOpenAngle = 0f;
+    
+    [Tooltip("中指握緊角度 (度)")]
+    public float middleCloseAngle = -60f;
+    
+    [Tooltip("無名指張開角度 (度)")]
+    public float ringOpenAngle = 10f;
+    
+    [Tooltip("無名指握緊角度 (度)")]
+    public float ringCloseAngle = -67f;
+    
+    [Tooltip("尾指張開角度 (度)")]
+    public float littleOpenAngle = 16f;
+    
+    [Tooltip("尾指握緊角度 (度)")]
+    public float littleCloseAngle = -78f;
     
     [Header("=== 拇指專用角度 ===")]
     [Tooltip("拇指 Y 軸（旋轉）張開角度")]
-    public float thumbRotateOpen = 10f;
+    public float thumbRotateOpen = 9f;
     
     [Tooltip("拇指 Y 軸（旋轉）握緊角度")]
-    public float thumbRotateClose = 18f;
+    public float thumbRotateClose = 17f;
     
     [Tooltip("拇指 Z 軸（彎曲）張開角度")]
-    public float thumbBendOpen = -2f;
+    public float thumbBendOpen = 0f;
     
     [Tooltip("拇指 Z 軸（彎曲）握緊角度")]
-    public float thumbBendClose = -54f;
+    public float thumbBendClose = -40f;
 
     [Header("=== 狀態監控 ===")]
     [SerializeField] private bool rosConnected = false;
@@ -224,13 +242,13 @@ public class EHandFingerReader : MonoBehaviour
     /// </summary>
     private void ReadLeftFingers()
     {
-        // 讀取目標值
+        // 讀取目標值（每根手指使用專屬角度範圍）
         targetLeftFingerValues[0] = GetThumbBend(leftThumbProximal, 1, thumbRotateOpen, thumbRotateClose);
         targetLeftFingerValues[1] = GetThumbBend(leftThumbProximal, 2, thumbBendOpen, thumbBendClose);
-        targetLeftFingerValues[2] = GetFingerBend(leftIndexProximal);
-        targetLeftFingerValues[3] = GetFingerBend(leftMiddleProximal);
-        targetLeftFingerValues[4] = GetFingerBend(leftRingProximal);
-        targetLeftFingerValues[5] = GetFingerBend(leftLittleProximal);
+        targetLeftFingerValues[2] = GetFingerBend(leftIndexProximal, indexOpenAngle, indexCloseAngle);
+        targetLeftFingerValues[3] = GetFingerBend(leftMiddleProximal, middleOpenAngle, middleCloseAngle);
+        targetLeftFingerValues[4] = GetFingerBend(leftRingProximal, ringOpenAngle, ringCloseAngle);
+        targetLeftFingerValues[5] = GetFingerBend(leftLittleProximal, littleOpenAngle, littleCloseAngle);
         
         // 平滑插值
         for (int i = 0; i < 6; i++)
@@ -244,13 +262,13 @@ public class EHandFingerReader : MonoBehaviour
     /// </summary>
     private void ReadRightFingers()
     {
-        // 讀取目標值
+        // 讀取目標值（每根手指使用專屬角度範圍）
         targetRightFingerValues[0] = GetThumbBend(rightThumbProximal, 1, thumbRotateOpen, thumbRotateClose);
         targetRightFingerValues[1] = GetThumbBend(rightThumbProximal, 2, thumbBendOpen, thumbBendClose);
-        targetRightFingerValues[2] = GetFingerBend(rightIndexProximal);
-        targetRightFingerValues[3] = GetFingerBend(rightMiddleProximal);
-        targetRightFingerValues[4] = GetFingerBend(rightRingProximal);
-        targetRightFingerValues[5] = GetFingerBend(rightLittleProximal);
+        targetRightFingerValues[2] = GetFingerBend(rightIndexProximal, indexOpenAngle, indexCloseAngle);
+        targetRightFingerValues[3] = GetFingerBend(rightMiddleProximal, middleOpenAngle, middleCloseAngle);
+        targetRightFingerValues[4] = GetFingerBend(rightRingProximal, ringOpenAngle, ringCloseAngle);
+        targetRightFingerValues[5] = GetFingerBend(rightLittleProximal, littleOpenAngle, littleCloseAngle);
         
         // 平滑插值
         for (int i = 0; i < 6; i++)
@@ -288,7 +306,7 @@ public class EHandFingerReader : MonoBehaviour
     /// <summary>
     /// 計算手指彎曲程度 (0=張開, 1=握緊)
     /// </summary>
-    private float GetFingerBend(Transform fingerBone)
+    private float GetFingerBend(Transform fingerBone, float openAngle, float closeAngle)
     {
         if (fingerBone == null) return 0f;
 
