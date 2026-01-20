@@ -479,4 +479,161 @@ public class EHandFingerReader : MonoBehaviour
     /// 檢查是否連線
     /// </summary>
     public bool IsConnected => rosConnected;
+
+    // ========================================
+    // 動態校準功能
+    // ========================================
+
+    [Header("=== 動態校準 ===")]
+    [Tooltip("顯示當前手指的原始角度")]
+    public bool showCurrentAngles = false;
+
+    /// <summary>
+    /// 校準當前手勢為「張開」極值
+    /// 在 Unity Inspector 中右鍵點擊組件 → "校準當前手勢為張開"
+    /// </summary>
+    [ContextMenu("校準當前手勢為張開")]
+    public void CalibrateOpen()
+    {
+        if (leftIndexProximal == null)
+        {
+            Debug.LogError("[Calibrate] 找不到手指骨骼！請先設定 Transform 參考。");
+            return;
+        }
+
+        Debug.Log("=== 開始校準「張開」極值 ===");
+
+        // 讀取當前角度
+        float indexZ = GetCurrentAngle(leftIndexProximal);
+        float middleZ = GetCurrentAngle(leftMiddleProximal);
+        float ringZ = GetCurrentAngle(leftRingProximal);
+        float littleZ = GetCurrentAngle(leftLittleProximal);
+        
+        Vector3 thumbEuler = leftThumbProximal.localEulerAngles;
+        float thumbY = thumbEuler.y > 180f ? thumbEuler.y - 360f : thumbEuler.y;
+        float thumbZ = thumbEuler.z > 180f ? thumbEuler.z - 360f : thumbEuler.z;
+
+        // 更新參數
+        indexOpenAngle = indexZ;
+        middleOpenAngle = middleZ;
+        ringOpenAngle = ringZ;
+        littleOpenAngle = littleZ;
+        thumbRotateOpen = thumbY;
+        thumbBendOpen = thumbZ;
+
+        // 輸出結果
+        Debug.Log($"[食指] openAngle = {indexZ:F1}°");
+        Debug.Log($"[中指] openAngle = {middleZ:F1}°");
+        Debug.Log($"[無名指] openAngle = {ringZ:F1}°");
+        Debug.Log($"[尾指] openAngle = {littleZ:F1}°");
+        Debug.Log($"[拇指Y] openAngle = {thumbY:F1}°");
+        Debug.Log($"[拇指Z] openAngle = {thumbZ:F1}°");
+        Debug.Log("=== 校準完成！===");
+    }
+
+    /// <summary>
+    /// 校準當前手勢為「握緊」極值
+    /// 在 Unity Inspector 中右鍵點擊組件 → "校準當前手勢為握緊"
+    /// </summary>
+    [ContextMenu("校準當前手勢為握緊")]
+    public void CalibrateClosed()
+    {
+        if (leftIndexProximal == null)
+        {
+            Debug.LogError("[Calibrate] 找不到手指骨骼！請先設定 Transform 參考。");
+            return;
+        }
+
+        Debug.Log("=== 開始校準「握緊」極值 ===");
+
+        // 讀取當前角度
+        float indexZ = GetCurrentAngle(leftIndexProximal);
+        float middleZ = GetCurrentAngle(leftMiddleProximal);
+        float ringZ = GetCurrentAngle(leftRingProximal);
+        float littleZ = GetCurrentAngle(leftLittleProximal);
+        
+        Vector3 thumbEuler = leftThumbProximal.localEulerAngles;
+        float thumbY = thumbEuler.y > 180f ? thumbEuler.y - 360f : thumbEuler.y;
+        float thumbZ = thumbEuler.z > 180f ? thumbEuler.z - 360f : thumbEuler.z;
+
+        // 更新參數
+        indexCloseAngle = indexZ;
+        middleCloseAngle = middleZ;
+        ringCloseAngle = ringZ;
+        littleCloseAngle = littleZ;
+        thumbRotateClose = thumbY;
+        thumbBendClose = thumbZ;
+
+        // 輸出結果
+        Debug.Log($"[食指] closeAngle = {indexZ:F1}°");
+        Debug.Log($"[中指] closeAngle = {middleZ:F1}°");
+        Debug.Log($"[無名指] closeAngle = {ringZ:F1}°");
+        Debug.Log($"[尾指] closeAngle = {littleZ:F1}°");
+        Debug.Log($"[拇指Y] closeAngle = {thumbY:F1}°");
+        Debug.Log($"[拇指Z] closeAngle = {thumbZ:F1}°");
+        Debug.Log("=== 校準完成！===");
+    }
+
+    /// <summary>
+    /// 顯示當前所有手指的原始角度（用於調試）
+    /// </summary>
+    [ContextMenu("顯示當前手指角度")]
+    public void ShowCurrentAngles()
+    {
+        if (leftIndexProximal == null)
+        {
+            Debug.LogError("[ShowAngles] 找不到手指骨骼！");
+            return;
+        }
+
+        Debug.Log("=== 當前手指角度 ===");
+        Debug.Log($"[食指] Z = {GetCurrentAngle(leftIndexProximal):F1}°");
+        Debug.Log($"[中指] Z = {GetCurrentAngle(leftMiddleProximal):F1}°");
+        Debug.Log($"[無名指] Z = {GetCurrentAngle(leftRingProximal):F1}°");
+        Debug.Log($"[尾指] Z = {GetCurrentAngle(leftLittleProximal):F1}°");
+        
+        Vector3 thumbEuler = leftThumbProximal.localEulerAngles;
+        float thumbY = thumbEuler.y > 180f ? thumbEuler.y - 360f : thumbEuler.y;
+        float thumbZ = thumbEuler.z > 180f ? thumbEuler.z - 360f : thumbEuler.z;
+        Debug.Log($"[拇指] Y = {thumbY:F1}°, Z = {thumbZ:F1}°");
+        Debug.Log("==================");
+    }
+
+    /// <summary>
+    /// 取得指定骨骼當前的 Z 軸角度（-180~180）
+    /// </summary>
+    private float GetCurrentAngle(Transform bone)
+    {
+        if (bone == null) return 0f;
+        
+        Vector3 euler = bone.localEulerAngles;
+        float angle = bendAxis == 0 ? euler.x : (bendAxis == 1 ? euler.y : euler.z);
+        
+        // 轉換為 -180~180
+        if (angle > 180f) angle -= 360f;
+        
+        return angle;
+    }
+
+    /// <summary>
+    /// 輸出當前校準參數（用於複製到其他場景）
+    /// </summary>
+    [ContextMenu("輸出校準參數")]
+    public void PrintCalibrationData()
+    {
+        Debug.Log("=== 當前校準參數 ===");
+        Debug.Log($"indexOpenAngle = {indexOpenAngle:F1}f;");
+        Debug.Log($"indexCloseAngle = {indexCloseAngle:F1}f;");
+        Debug.Log($"middleOpenAngle = {middleOpenAngle:F1}f;");
+        Debug.Log($"middleCloseAngle = {middleCloseAngle:F1}f;");
+        Debug.Log($"ringOpenAngle = {ringOpenAngle:F1}f;");
+        Debug.Log($"ringCloseAngle = {ringCloseAngle:F1}f;");
+        Debug.Log($"littleOpenAngle = {littleOpenAngle:F1}f;");
+        Debug.Log($"littleCloseAngle = {littleCloseAngle:F1}f;");
+        Debug.Log($"thumbRotateOpen = {thumbRotateOpen:F1}f;");
+        Debug.Log($"thumbRotateClose = {thumbRotateClose:F1}f;");
+        Debug.Log($"thumbBendOpen = {thumbBendOpen:F1}f;");
+        Debug.Log($"thumbBendClose = {thumbBendClose:F1}f;");
+        Debug.Log("==================");
+    }
 }
