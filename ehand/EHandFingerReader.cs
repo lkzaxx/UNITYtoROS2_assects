@@ -432,41 +432,41 @@ public class EHandFingerReader : MonoBehaviour
                 // 食指 Debug (F3) - 三關節累加
                 if (leftIndexProximal != null)
                 {
-                    float total = GetCurrentAngle(
-                        leftIndexProximal, 
-                        leftIndexIntermediate, 
-                        leftIndexDistal);
-                    Debug.Log($"[F3 食指] 總角度={total:F1}° → output={leftFingerValues[2]:F2}");
+                    float p = GetJointAngle(leftIndexProximal);
+                    float i = GetJointAngle(leftIndexIntermediate);
+                    float d = GetJointAngle(leftIndexDistal);
+                    float total = p + i + d;
+                    Debug.Log($"[F3 食指] 總角度={total:F1}° (P:{p:F1}° I:{i:F1}° D:{d:F1}°) → output={leftFingerValues[2]:F2}");
                 }
                 
                 // 中指 Debug (F4) - 三關節累加
                 if (leftMiddleProximal != null)
                 {
-                    float total = GetCurrentAngle(
-                        leftMiddleProximal, 
-                        leftMiddleIntermediate, 
-                        leftMiddleDistal);
-                    Debug.Log($"[F4 中指] 總角度={total:F1}° → output={leftFingerValues[3]:F2}");
+                    float p = GetJointAngle(leftMiddleProximal);
+                    float i = GetJointAngle(leftMiddleIntermediate);
+                    float d = GetJointAngle(leftMiddleDistal);
+                    float total = p + i + d;
+                    Debug.Log($"[F4 中指] 總角度={total:F1}° (P:{p:F1}° I:{i:F1}° D:{d:F1}°) → output={leftFingerValues[3]:F2}");
                 }
                 
                 // 無名指 Debug (F5) - 三關節累加
                 if (leftRingProximal != null)
                 {
-                    float total = GetCurrentAngle(
-                        leftRingProximal, 
-                        leftRingIntermediate, 
-                        leftRingDistal);
-                    Debug.Log($"[F5 無名指] 總角度={total:F1}° → output={leftFingerValues[4]:F2}");
+                    float p = GetJointAngle(leftRingProximal);
+                    float i = GetJointAngle(leftRingIntermediate);
+                    float d = GetJointAngle(leftRingDistal);
+                    float total = p + i + d;
+                    Debug.Log($"[F5 無名指] 總角度={total:F1}° (P:{p:F1}° I:{i:F1}° D:{d:F1}°) → output={leftFingerValues[4]:F2}");
                 }
                 
                 // 尾指 Debug (F6) - 三關節累加
                 if (leftLittleProximal != null)
                 {
-                    float total = GetCurrentAngle(
-                        leftLittleProximal, 
-                        leftLittleIntermediate, 
-                        leftLittleDistal);
-                    Debug.Log($"[F6 尾指] 總角度={total:F1}° → output={leftFingerValues[5]:F2}");
+                    float p = GetJointAngle(leftLittleProximal);
+                    float i = GetJointAngle(leftLittleIntermediate);
+                    float d = GetJointAngle(leftLittleDistal);
+                    float total = p + i + d;
+                    Debug.Log($"[F6 尾指] 總角度={total:F1}° (P:{p:F1}° I:{i:F1}° D:{d:F1}°) → output={leftFingerValues[5]:F2}");
                 }
                 
                 Debug.Log("==================");
