@@ -366,6 +366,11 @@ public class EHandFingerReader : MonoBehaviour
     /// 計算手指彎曲程度 (0=張開, 1=握緊)
     /// 使用三關節累加（Proximal + Intermediate + Distal）
     /// 符合 Unity XR Hands 標準做法
+    /// 
+    /// 特殊處理：Distal 正值抑制
+    /// - 手指伸直時，Distal 會產生正值（過度伸展）
+    /// - 這會抵消 P+I 的負值，導致總角度不準確
+    /// - 將 Distal 正值視為 0，只累加負值部分
     /// </summary>
     private float GetFingerBend(
         Transform proximal,
@@ -377,10 +382,19 @@ public class EHandFingerReader : MonoBehaviour
         if (proximal == null || intermediate == null || distal == null)
             return 0f;
 
+        // 取得各關節角度
+        float pAngle = GetJointAngle(proximal);
+        float iAngle = GetJointAngle(intermediate);
+        float dAngle = GetJointAngle(distal);
+        
+        // Distal 正值抑制：忽略過度伸展（只計算彎曲部分）
+        if (dAngle > 0f)
+        {
+            dAngle = 0f;
+        }
+
         // 累加三個關節的 Z 軸角度
-        float totalAngle = GetJointAngle(proximal)
-                         + GetJointAngle(intermediate)
-                         + GetJointAngle(distal);
+        float totalAngle = pAngle + iAngle + dAngle;
 
         // 映射到 0~1
         float bend = Mathf.InverseLerp(openAngle, closeAngle, totalAngle);
