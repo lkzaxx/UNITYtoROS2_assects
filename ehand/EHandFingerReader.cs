@@ -103,43 +103,43 @@ public class EHandFingerReader : MonoBehaviour
     [Tooltip("啟用右手")]
     public bool enableRightHand = true;
 
-    [Header("=== 手指角度映射（每根手指獨立設定）===")]
-    [Tooltip("食指張開角度 (度)")]
-    public float indexOpenAngle = -7f;
+    [Header("=== 手指角度映射（基於實測數據優化）===")]
+    [Tooltip("食指張開角度 (度) - 涵蓋所有伸直姿態（張開手 ~0°, 比1 ~-30°）")]
+    public float indexOpenAngle = -30f;
     
-    [Tooltip("食指握緊角度 (度)")]
-    public float indexCloseAngle = -58f;
+    [Tooltip("食指握緊角度 (度) - 基於實際握拳數據")]
+    public float indexCloseAngle = -165f;
     
-    [Tooltip("中指張開角度 (度)")]
-    public float middleOpenAngle = 0f;
+    [Tooltip("中指張開角度 (度) - 張開手時約 +12°")]
+    public float middleOpenAngle = +12f;
     
-    [Tooltip("中指握緊角度 (度)")]
-    public float middleCloseAngle = -60f;
+    [Tooltip("中指握緊角度 (度) - 基於實際握拳數據")]
+    public float middleCloseAngle = -160f;
     
-    [Tooltip("無名指張開角度 (度)")]
-    public float ringOpenAngle = 10f;
+    [Tooltip("無名指張開角度 (度) - 張開手時約 +15°")]
+    public float ringOpenAngle = +15f;
     
-    [Tooltip("無名指握緊角度 (度)")]
-    public float ringCloseAngle = -67f;
+    [Tooltip("無名指握緊角度 (度) - 基於實際握拳數據")]
+    public float ringCloseAngle = -163f;
     
-    [Tooltip("尾指張開角度 (度)")]
-    public float littleOpenAngle = 16f;
+    [Tooltip("尾指張開角度 (度) - 張開手時約 +20°")]
+    public float littleOpenAngle = +20f;
     
-    [Tooltip("尾指握緊角度 (度)")]
-    public float littleCloseAngle = -78f;
+    [Tooltip("尾指握緊角度 (度) - 基於實際握拳數據")]
+    public float littleCloseAngle = -180f;
     
     [Header("=== 拇指專用角度 ===")]
     [Tooltip("拇指 Y 軸（旋轉）張開角度")]
-    public float thumbRotateOpen = 9f;
+    public float thumbRotateOpen = +10f;
     
     [Tooltip("拇指 Y 軸（旋轉）握緊角度")]
-    public float thumbRotateClose = 17f;
+    public float thumbRotateClose = +16f;
     
     [Tooltip("拇指 Z 軸（彎曲）張開角度")]
     public float thumbBendOpen = 0f;
     
     [Tooltip("拇指 Z 軸（彎曲）握緊角度")]
-    public float thumbBendClose = -40f;
+    public float thumbBendClose = -35f;
 
     [Header("=== 狀態監控 ===")]
     [SerializeField] private bool rosConnected = false;
