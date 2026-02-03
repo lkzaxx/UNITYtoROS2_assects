@@ -29,11 +29,15 @@ public class OpenArmRetarget : MonoBehaviour
         public float maxDeg = 180f;             // 目標上限
 
         [Header("Stability")]
-        public float deadZone = 2f;             // 死區：|角度| < deadZone 視為 0
+        public float deadZone = 2f;             // 死區：|角度變化| < deadZone 視為靜止
         public float hysteresis = 1.5f;         // 遷就帶：一旦進入死區，要超過此值才解除
-        public float smoothAlpha = 0.25f;       // 低通濾波（0~1，越大越跟手）
+        public float smoothTime = 0.08f;        // 平滑時間（秒），越大越平滑
         public float rateLimitDegPerSec = 180f; // 角速度上限（deg/s）
         public float softLimitMargin = 8f;      // 靠近上下限時提前降速的緩衝（度）
+
+        [Header("Anti-Jitter（防抖）")]
+        public float jitterThreshold = 1.0f;    // 抖動閾值：變化小於此值視為噪音
+        public float holdTime = 0.15f;          // 靜止判定時間（秒）
 
         [Header("Drive")]
         public float stiffness = 4000f;
@@ -44,7 +48,12 @@ public class OpenArmRetarget : MonoBehaviour
         float _filteredDeg;        // 濾波後角度
         float _lastCmdDeg;         // 上一幀送給驅動器的角度
         bool  _inDeadHold;         // 是否位於死區並被「鎖住」
-        float _deadCenter;         // 死區中心（通常為 0）
+        float _deadCenter;         // 死區中心（動態更新）
+
+        // 防抖狀態
+        float _lastRawDeg;         // 上一幀的原始角度
+        float _stillTimer;         // 靜止計時器
+        bool  _isHolding;          // 是否正在保持靜止
         
         // 校準鎖定狀態
         public bool isLocked = false;      // 是否被鎖定在目標角度
@@ -185,29 +194,48 @@ public class OpenArmRetarget : MonoBehaviour
             float src = ReadSourceAngleDegRaw();
             float mapped = offsetDeg + scale * src;
 
-            // 2) 死區 + 遷就帶（防飄 & 手停就停）
-            // 進入死區就「鎖住」在 deadCenter（通常 0）
-            if (_inDeadHold)
+            // 2) 防抖動檢測：如果角度變化很小，判定為靜止
+            float rawDelta = Mathf.Abs(mapped - _lastRawDeg);
+            _lastRawDeg = mapped;
+
+            if (rawDelta < jitterThreshold)
             {
-                // 只有超過 deadZone + hysteresis 才解除
-                if (Mathf.Abs(mapped - _deadCenter) > (deadZone + hysteresis))
-                    _inDeadHold = false;
-                else
-                    mapped = _deadCenter;
+                // 變化小於閾值，累加靜止時間
+                _stillTimer += deltaTime;
+                if (_stillTimer >= holdTime && !_isHolding)
+                {
+                    // 達到靜止時間，鎖定在當前濾波後的位置
+                    _isHolding = true;
+                    _deadCenter = _filteredDeg;  // 動態更新死區中心
+                }
             }
             else
             {
-                if (Mathf.Abs(mapped - _deadCenter) < deadZone)
+                // 有明顯移動，重置靜止狀態
+                _stillTimer = 0f;
+                _isHolding = false;
+            }
+
+            // 3) 動態死區：靜止時鎖定在當前位置
+            if (_isHolding)
+            {
+                // 只有超過 deadZone + hysteresis 才解除鎖定
+                if (Mathf.Abs(mapped - _deadCenter) > (deadZone + hysteresis))
                 {
-                    _inDeadHold = true;
-                    mapped = _deadCenter;
+                    _isHolding = false;
+                    _stillTimer = 0f;
+                }
+                else
+                {
+                    mapped = _deadCenter;  // 保持在鎖定位置
                 }
             }
 
-            // 3) 低通濾波（EM A）
-            _filteredDeg = Mathf.Lerp(_filteredDeg, mapped, Mathf.Clamp01(smoothAlpha));
+            // 4) 時間獨立的低通濾波（指數平滑）
+            float alpha = 1f - Mathf.Exp(-deltaTime / Mathf.Max(smoothTime, 0.001f));
+            _filteredDeg = Mathf.Lerp(_filteredDeg, mapped, alpha);
 
-            // 4) 軟上限（接近邊界時提前降速，避免敲打）
+            // 5) 軟上限（接近邊界時提前降速，避免敲打）
             float lowerSoft = minDeg + softLimitMargin;
             float upperSoft = maxDeg - softLimitMargin;
             float targetDeg = Mathf.Clamp(_filteredDeg, minDeg, maxDeg);
@@ -224,7 +252,7 @@ public class OpenArmRetarget : MonoBehaviour
                 targetDeg = Mathf.Lerp(targetDeg, lowerSoft, t);
             }
 
-            // 5) 限速（deg/s）
+            // 6) 限速（deg/s）
             if (rateLimitDegPerSec > 0f && deltaTime > 0f)
             {
                 float maxStep = rateLimitDegPerSec * deltaTime;
@@ -232,7 +260,7 @@ public class OpenArmRetarget : MonoBehaviour
                 targetDeg = _lastCmdDeg + step;
             }
 
-            // 6) 寫入目標
+            // 7) 寫入目標
             drive.target = targetDeg; // ArticulationDrive.target 單位為「度」
             joint.xDrive = drive;
 
@@ -249,23 +277,104 @@ public class OpenArmRetarget : MonoBehaviour
     [Header("Global")]
     public bool autoCalibrateOnStart = true;
 
+    [Header("APK 初始化延遲")]
+    [Tooltip("啟動時延遲初始化的時間（秒），等待 XR 系統準備好")]
+    public float initDelay = 1.0f;
+
+    bool _initialized = false;
+
     void Start()
     {
         // ===== APK 物理震盪修復 =====
-        // 強制設定物理求解器迭代次數，確保 APK 與 Editor 行為一致
-        Physics.defaultSolverIterations = 20;
-        Physics.defaultSolverVelocityIterations = 10;
+        // 1. 全域設定（影響新建物體）
+        Physics.defaultSolverIterations = 25;
+        Physics.defaultSolverVelocityIterations = 15;
+
+        // 2. 針對每個 ArticulationBody 單獨設定（影響已存在的物體）
+        SetArticulationSolverIterations(left, 25, 15);
+        SetArticulationSolverIterations(right, 25, 15);
         // ===== 修復結束 =====
+
+        // 延遲初始化，等待 XR 系統準備好
+        StartCoroutine(DelayedInitialize());
+    }
+
+    System.Collections.IEnumerator DelayedInitialize()
+    {
+        // 等待指定時間，讓 XR 系統完成初始化
+        yield return new WaitForSeconds(initDelay);
+
+        // 等待一幀，確保所有 Transform 已更新
+        yield return null;
+
+        Initialize();
+    }
+
+    void Initialize()
+    {
+        if (_initialized) return;
 
         if (autoCalibrateOnStart)
         {
             if (left != null)  foreach (var j in left)  j?.CalibrateNeutral();
             if (right != null) foreach (var j in right) j?.CalibrateNeutral();
         }
+
+        _initialized = true;
+        Debug.Log("[OpenArmRetarget] 初始化完成");
+    }
+
+    /// <summary>
+    /// 當 Quest 被放下/戴回時觸發，重新校準
+    /// </summary>
+    void OnApplicationPause(bool pauseStatus)
+    {
+        if (!pauseStatus && _initialized)
+        {
+            // 從暫停恢復時，重新校準
+            Debug.Log("[OpenArmRetarget] 從暫停恢復，重新校準");
+            StartCoroutine(RecalibrateAfterResume());
+        }
+    }
+
+    System.Collections.IEnumerator RecalibrateAfterResume()
+    {
+        // 等待一小段時間讓 XR 系統恢復
+        yield return new WaitForSeconds(0.5f);
+        yield return null;
+
+        if (left != null)  foreach (var j in left)  j?.CalibrateNeutral();
+        if (right != null) foreach (var j in right) j?.CalibrateNeutral();
+
+        Debug.Log("[OpenArmRetarget] 重新校準完成");
+    }
+
+    /// <summary>
+    /// 設定 ArticulationBody 的求解器迭代次數（方案3）
+    /// </summary>
+    void SetArticulationSolverIterations(JointMap[] joints, int posIterations, int velIterations)
+    {
+        if (joints == null) return;
+
+        foreach (var j in joints)
+        {
+            if (j?.joint != null)
+            {
+                j.joint.solverIterations = posIterations;
+                j.joint.solverVelocityIterations = velIterations;
+
+                // 額外增加關節摩擦和角阻尼來抑制震盪
+                j.joint.jointFriction = 5f;
+                j.joint.angularDamping = 50f;
+            }
+        }
     }
 
     void FixedUpdate()
     {
+        // 只有初始化完成後才執行
+        if (!_initialized) return;
+
         float dt = Time.fixedDeltaTime;
         if (left != null)  foreach (var j in left)  j?.Apply(dt);
         if (right != null) foreach (var j in right) j?.Apply(dt);
