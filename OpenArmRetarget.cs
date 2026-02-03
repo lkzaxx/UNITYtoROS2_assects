@@ -251,6 +251,12 @@ public class OpenArmRetarget : MonoBehaviour
 
     void Start()
     {
+        // ===== APK 物理震盪修復 =====
+        // 強制設定物理求解器迭代次數，確保 APK 與 Editor 行為一致
+        Physics.defaultSolverIterations = 20;
+        Physics.defaultSolverVelocityIterations = 10;
+        // ===== 修復結束 =====
+
         if (autoCalibrateOnStart)
         {
             if (left != null)  foreach (var j in left)  j?.CalibrateNeutral();
