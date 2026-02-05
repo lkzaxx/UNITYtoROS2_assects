@@ -45,7 +45,7 @@ public class ROSTCPManager : MonoBehaviour
     [Header("OpenArm Retarget 自動發送")]
     public OpenArmRetarget retarget;                 // OpenArmRetarget 引用
     public bool autoSendJointStates = false;         // 是否自動發送關節狀態
-    public float jointStateSendInterval = 0.5f;      // 發送間隔（秒）
+    public float jointStateSendInterval = 0.02f;     // 發送間隔（秒）- 50Hz
     public bool showJointValuesOnScreen = true;      // 在螢幕上顯示關節值
     [Tooltip("左臂關節名稱（7個）")]
     public string[] leftJointNames = new string[7] {
