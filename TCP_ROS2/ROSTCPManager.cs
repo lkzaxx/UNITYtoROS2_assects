@@ -145,6 +145,8 @@ public class ROSTCPManager : MonoBehaviour
     public InputActionReference leftSideButtonAction;
     [Tooltip("右手側鍵 Input Action（例如 Right Grip / Trigger / 任意按鍵）")]
     public InputActionReference rightSideButtonAction;
+    [Tooltip("任一手按住側鍵即可同時發送雙臂（ehand 模式下無法同時按兩手側鍵時使用）")]
+    public bool linkedSideButton = true;
 
     // 單例模式
     private static ROSTCPManager instance;
@@ -1132,8 +1134,12 @@ public class ROSTCPManager : MonoBehaviour
 
     void FixedUpdate()
     {
-        bool canSendLeft = !requireSideButtonToSend || IsLeftSideButtonPressed();
-        bool canSendRight = !requireSideButtonToSend || IsRightSideButtonPressed();
+        bool leftPressed = IsLeftSideButtonPressed();
+        bool rightPressed = IsRightSideButtonPressed();
+        bool eitherPressed = leftPressed || rightPressed;
+
+        bool canSendLeft = !requireSideButtonToSend || (linkedSideButton ? eitherPressed : leftPressed);
+        bool canSendRight = !requireSideButtonToSend || (linkedSideButton ? eitherPressed : rightPressed);
 
         // 自動發送關節狀態
         if (autoSendJointStates && retarget != null && isConnected && ros != null)
