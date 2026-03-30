@@ -1120,31 +1120,42 @@ public class ROSTCPManager : MonoBehaviour
         bool canSendLeft = !requireSideButtonToSend || (linkedSideButton ? eitherPressed : leftPressed);
         bool canSendRight = !requireSideButtonToSend || (linkedSideButton ? eitherPressed : rightPressed);
 
-        // 自動發送關節狀態
-        if (autoSendJointStates && retarget != null && isConnected && ros != null)
+        // 自動發送（關節 + 夾爪合併為單一訊息，每幀只 Publish 1 次）
+        if (isConnected && ros != null && Time.time - lastJointStateSendTime >= jointStateSendInterval)
         {
-            // 左右手分別根據各自側鍵決定是否發送
-            if (Time.time - lastJointStateSendTime >= jointStateSendInterval)
+            List<string> allNames = new List<string>();
+            List<float> allPositions = new List<float>();
+
+            // 收集關節角度
+            if (autoSendJointStates && retarget != null)
             {
                 if (canSendLeft)
-                    SendRetargetJointsToROS2("left", retarget.left, leftJointNames, true);
+                    CollectRetargetJoints(retarget.left, leftJointNames, true, allNames, allPositions);
                 if (canSendRight)
-                    SendRetargetJointsToROS2("right", retarget.right, rightJointNames, false);
-
-                if (canSendLeft || canSendRight)
-                    lastJointStateSendTime = Time.time;
+                    CollectRetargetJoints(retarget.right, rightJointNames, false, allNames, allPositions);
             }
-        }
 
-        // 自動發送夾爪 L_EE / R_EE
-        if (autoSendGripperEE && (leftGripper != null || rightGripper != null) && isConnected && ros != null)
-        {
-            // 夾爪：只要任一側鍵按住即可發送
-            bool canSendGripper = !requireSideButtonToSend || canSendLeft || canSendRight;
-            if (canSendGripper && Time.time - lastGripperSendTime >= gripperSendInterval)
+            // 收集夾爪值（附加到同一訊息）
+            if (autoSendGripperEE)
             {
-                PublishGripperEEJointState();
-                lastGripperSendTime = Time.time;
+                bool canSendGripper = !requireSideButtonToSend || canSendLeft || canSendRight;
+                if (canSendGripper)
+                {
+                    float left = GetJawTargetMeters(leftGripper, leftGripper != null ? leftGripper.leftJaw : null);
+                    float right = GetJawTargetMeters(rightGripper, rightGripper != null ? rightGripper.rightJaw : null);
+                    left = Mathf.Clamp(left, gripperMin, gripperMax);
+                    right = Mathf.Clamp(right, gripperMin, gripperMax);
+                    allNames.Add(leftEEName);
+                    allPositions.Add(left);
+                    allNames.Add(rightEEName);
+                    allPositions.Add(right);
+                }
+            }
+
+            if (allNames.Count > 0)
+            {
+                PublishJointCommands(allNames.ToArray(), allPositions.ToArray());
+                lastJointStateSendTime = Time.time;
             }
         }
     }
@@ -1225,6 +1236,28 @@ public class ROSTCPManager : MonoBehaviour
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// 收集關節角度到列表（不發送），供合併發送使用
+    /// </summary>
+    void CollectRetargetJoints(OpenArmRetarget.JointMap[] joints, string[] jointNames, bool isLeft,
+        List<string> outNames, List<float> outPositions)
+    {
+        if (joints == null || joints.Length == 0) return;
+        if (jointNames == null || jointNames.Length != joints.Length) return;
+
+        for (int i = 0; i < joints.Length; i++)
+        {
+            if (joints[i]?.joint == null) continue;
+
+            var drive = joints[i].joint.xDrive;
+            float angleRad = drive.target * Mathf.Deg2Rad;
+            angleRad = ClampJointAngle(angleRad, i, isLeft);
+
+            outNames.Add(jointNames[i]);
+            outPositions.Add(angleRad);
+        }
     }
 
     /// <summary>
