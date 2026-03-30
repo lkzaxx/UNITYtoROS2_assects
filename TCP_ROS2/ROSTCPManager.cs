@@ -1173,7 +1173,7 @@ public class ROSTCPManager : MonoBehaviour
     /// <summary>
     /// 檢查左手側鍵是否被按下（優先使用 Input Action，可在 Inspector 選擇；若未設定則退回 XR Left Grip 偵測）
     /// </summary>
-    bool IsLeftSideButtonPressed()
+    public bool IsLeftSideButtonPressed()
     {
         // 1) 優先使用可在 Inspector 指定的 Input Action
         if (leftSideButtonAction != null && leftSideButtonAction.action != null)
@@ -1212,7 +1212,7 @@ public class ROSTCPManager : MonoBehaviour
     /// <summary>
     /// 檢查右手側鍵是否被按下（優先使用 Input Action，可在 Inspector 選擇；若未設定則退回 XR Right Grip 偵測）
     /// </summary>
-    bool IsRightSideButtonPressed()
+    public bool IsRightSideButtonPressed()
     {
         // 1) 優先使用可在 Inspector 指定的 Input Action
         if (rightSideButtonAction != null && rightSideButtonAction.action != null)

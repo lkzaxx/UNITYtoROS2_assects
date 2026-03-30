@@ -141,6 +141,12 @@ public class EHandFingerReader : MonoBehaviour
     [Tooltip("拇指 Z 軸（彎曲）握緊角度")]
     public float thumbBendClose = -35f;
 
+    [Header("=== VR 側鍵控制（與 ROSTCPManager 連動）===")]
+    [Tooltip("開啟後，只有按住側鍵才會發送手指訊息到 ROS2")]
+    public bool requireSideButtonToSend = true;
+    [Tooltip("任一手按住側鍵即可同時發送雙手手指（與 ROSTCPManager.linkedSideButton 同理）")]
+    public bool linkedSideButton = true;
+
     [Header("=== 狀態監控 ===")]
     [SerializeField] private bool rosConnected = false;
     [SerializeField] private int messagesSent = 0;
@@ -242,10 +248,10 @@ public class EHandFingerReader : MonoBehaviour
         if (Time.time - lastPublishTime < 1f / publishRate) return;
         lastPublishTime = Time.time;
 
-        // 讀取手指角度
+        // 讀取手指角度（持續讀取，保持平滑插值不中斷）
         if (enableLeftHand) ReadLeftFingers();
         if (enableRightHand) ReadRightFingers();
-        
+
         // 測試模式：強制輸出指定值
         if (forceTestMode)
         {
@@ -256,8 +262,23 @@ public class EHandFingerReader : MonoBehaviour
             }
         }
 
-        // 發送 ROS 訊息
-        PublishEHandCommands();
+        // 側鍵控制：判斷是否允許發送
+        bool canSendLeft = true;
+        bool canSendRight = true;
+
+        if (requireSideButtonToSend && ROSTCPManager.Instance != null)
+        {
+            bool leftPressed = ROSTCPManager.Instance.IsLeftSideButtonPressed();
+            bool rightPressed = ROSTCPManager.Instance.IsRightSideButtonPressed();
+            bool eitherPressed = leftPressed || rightPressed;
+
+            canSendLeft = linkedSideButton ? eitherPressed : leftPressed;
+            canSendRight = linkedSideButton ? eitherPressed : rightPressed;
+        }
+
+        // 發送 ROS 訊息（只發送有權限的手）
+        if (canSendLeft || canSendRight)
+            PublishEHandCommands(canSendLeft, canSendRight);
     }
     
     [Header("=== 強制測試模式 ===")]
@@ -489,10 +510,15 @@ public class EHandFingerReader : MonoBehaviour
     }
 
     /// <summary>
-    /// 發送手指命令到 ROS
+    /// 發送手指命令到 ROS（根據側鍵狀態決定發送哪些手）
     /// </summary>
-    private void PublishEHandCommands()
+    private void PublishEHandCommands(bool sendLeft = true, bool sendRight = true)
     {
+        bool actualLeft = enableLeftHand && sendLeft;
+        bool actualRight = enableRightHand && sendRight;
+
+        if (!actualLeft && !actualRight) return;
+
         var msg = new JointStateMsg();
 
         // Header
@@ -507,8 +533,8 @@ public class EHandFingerReader : MonoBehaviour
 
         // 計算關節數量
         int jointCount = 0;
-        if (enableLeftHand) jointCount += 6;
-        if (enableRightHand) jointCount += 6;
+        if (actualLeft) jointCount += 6;
+        if (actualRight) jointCount += 6;
 
         msg.name = new string[jointCount];
         msg.position = new double[jointCount];
@@ -518,7 +544,7 @@ public class EHandFingerReader : MonoBehaviour
         int idx = 0;
 
         // 左手
-        if (enableLeftHand)
+        if (actualLeft)
         {
             for (int i = 0; i < 6; i++)
             {
@@ -531,7 +557,7 @@ public class EHandFingerReader : MonoBehaviour
         }
 
         // 右手
-        if (enableRightHand)
+        if (actualRight)
         {
             for (int i = 0; i < 6; i++)
             {
