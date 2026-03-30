@@ -493,14 +493,6 @@ public class ROSTCPManager : MonoBehaviour
 
         if (jointMsg.name != null && jointMsg.name.Length > 0)
         {
-            Debug.Log($"📥 收到關節狀態: {jointMsg.name.Length} 個關節");
-
-            // 顯示關節詳細資訊（調試用）
-            for (int i = 0; i < jointMsg.name.Length && i < jointMsg.position.Length; i++)
-            {
-                Debug.Log($"   {jointMsg.name[i]}: {jointMsg.position[i]:F3} rad");
-            }
-
             // 廣播關節狀態給 OpenArmController
             BroadcastToOpenArmControllers("OnJointStatesReceived", jointMsg);
         }
@@ -516,9 +508,6 @@ public class ROSTCPManager : MonoBehaviour
             var pos = poseMsg.pose.position;
             var rot = poseMsg.pose.orientation;
 
-            Debug.Log($"📥 收到末端執行器位置: Pos({pos.x:F3}, {pos.y:F3}, {pos.z:F3}) " +
-                     $"Rot({rot.x:F3}, {rot.y:F3}, {rot.z:F3}, {rot.w:F3})");
-
             // 廣播末端執行器位置給 OpenArmController
             BroadcastToOpenArmControllers("OnEndEffectorPoseReceived", poseMsg);
         }
@@ -528,8 +517,6 @@ public class ROSTCPManager : MonoBehaviour
     {
         messagesReceived++;
         lastMessageTime = Time.time;
-
-        Debug.Log($"📥 收到心跳回音: {echoMsg.data}");
 
         // 心跳回音確認連接正常
         isConnected = true;
@@ -608,12 +595,6 @@ public class ROSTCPManager : MonoBehaviour
 
             ros.Publish(jointCommandsTopic, jointMsg);
             messagesSent++;
-
-            Debug.Log($"📤 發送關節命令: {jointNames.Length} 個關節");
-            for (int i = 0; i < Mathf.Min(3, jointNames.Length); i++)
-            {
-                Debug.Log($"   {jointNames[i]}: {positions[i]:F3} rad");
-            }
         }
         catch (System.Exception ex)
         {
@@ -753,8 +734,6 @@ public class ROSTCPManager : MonoBehaviour
 
             ros.Publish(jointCommandsTopic, jointMsg);
             messagesSent++;
-
-            Debug.Log($"📤 發送夾爪 JointState: {leftEEName}={left:F4} m, {rightEEName}={right:F4} m");
         }
         catch (System.Exception ex)
         {
