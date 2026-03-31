@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using Unity.Robotics.ROSTCPConnector;
 using RosMessageTypes.Sensor;
 using RosMessageTypes.Std;
@@ -141,6 +142,14 @@ public class EHandFingerReader : MonoBehaviour
     [Tooltip("拇指 Z 軸（彎曲）握緊角度")]
     public float thumbBendClose = -35f;
 
+    [Header("=== 按鍵控制手張合 ===")]
+    [Tooltip("啟用後，按住前方按鍵（gripperButton）全部手指收攏(1.0)，放開全部張開(0.0)")]
+    public bool enableButtonGrip = true;
+    [Tooltip("左手張合按鍵（綁與夾爪相同的 triggerPressed）")]
+    public InputActionReference leftGripButton;
+    [Tooltip("右手張合按鍵（綁與夾爪相同的 triggerPressed）")]
+    public InputActionReference rightGripButton;
+
     [Header("=== VR 側鍵控制（與 ROSTCPManager 連動）===")]
     [Tooltip("開啟後，只有按住側鍵才會發送手指訊息到 ROS2")]
     public bool requireSideButtonToSend = true;
@@ -237,6 +246,13 @@ public class EHandFingerReader : MonoBehaviour
         ros.RegisterPublisher<JointStateMsg>(ehandCommandsTopic);
         Debug.Log($"[EHandFingerReader] ✓ Registered publisher: {ehandCommandsTopic}");
 
+        // 啟用手張合按鍵
+        if (enableButtonGrip)
+        {
+            if (leftGripButton != null) leftGripButton.action.Enable();
+            if (rightGripButton != null) rightGripButton.action.Enable();
+        }
+
         Debug.Log("[EHandFingerReader] === 初始化完成 ===");
     }
 
@@ -260,6 +276,19 @@ public class EHandFingerReader : MonoBehaviour
                 leftFingerValues[i] = forceTestValue;
                 rightFingerValues[i] = forceTestValue;
             }
+        }
+
+        // 按鍵控制手張合：按住=全收(1.0)，放開=全開(0.0)
+        if (enableButtonGrip)
+        {
+            bool leftBtn = leftGripButton != null && leftGripButton.action != null && leftGripButton.action.IsPressed();
+            bool rightBtn = rightGripButton != null && rightGripButton.action != null && rightGripButton.action.IsPressed();
+
+            for (int i = 0; i < 6; i++)
+                leftFingerValues[i] = leftBtn ? 1.0f : 0.0f;
+
+            for (int i = 0; i < 6; i++)
+                rightFingerValues[i] = rightBtn ? 1.0f : 0.0f;
         }
 
         // 側鍵控制：判斷是否允許發送
